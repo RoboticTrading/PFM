@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PFM -- Personal Financial Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=DM+Sans:wght@400;500&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/pfm.css">
+</head>
+<body>
+<div class="top-bar">
+  <div class="brand">
+    <span class="brand-mark">PFM</span>
+    <span class="brand-title">Personal Financial Manager</span>
+  </div>
+  <div class="top-actions">
+    <a href="/logout" class="btn btn-ghost btn-sm">Sign Out</a>
+  </div>
+</div>
+
+<div class="app-layout">
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-section">
+      <a class="nav-item active" data-page="dashboard" href="#dashboard">Dashboard</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-heading">Accounts</div>
+      <div id="nav-accounts"><div class="loading-state" style="padding:8px">Loading...</div></div>
+    </div>
+    <div class="sidebar-section">
+      <a class="nav-item" data-page="categories" href="#categories">Categories</a>
+    </div>
+    <div class="sidebar-section">
+      <a class="nav-item" data-page="reports" href="#reports">Reports</a>
+    </div>
+    <div class="sidebar-version">v1.0</div>
+  </nav>
+
+  <main class="content-area" id="page-content">
+    <div class="loading-state">Loading...</div>
+  </main>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal()">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 id="modal-title"></h3>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast-container"></div>
+
+<script src="/static/js/pfm.js"></script>
+</body>
+</html>

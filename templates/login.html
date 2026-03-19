@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PFM — Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep: #0a0d14; --bg-primary: #0e1118; --bg-surface: #12161f;
+    --gold: #b4964f; --text-primary: #d8d3c7; --text-muted: #6a7080;
+    --border: #1a1f2c; --danger: #b05555;
+    --font-display: 'Cormorant Garamond', serif;
+    --font-body: 'DM Sans', sans-serif;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg-deep); font-family:var(--font-body); color:var(--text-primary);
+    display:flex; align-items:center; justify-content:center; min-height:100vh; }
+  .card { background:var(--bg-surface); border:1px solid var(--border); border-radius:8px;
+    padding:40px; width:340px; text-align:center; }
+  h1 { font-family:var(--font-display); font-size:28px; font-weight:600; color:var(--gold);
+    margin-bottom:8px; }
+  .sub { font-size:12px; color:var(--text-muted); margin-bottom:24px; }
+  input { width:100%; padding:10px 14px; background:var(--bg-deep); border:1px solid var(--border);
+    border-radius:4px; color:var(--text-primary); font-family:var(--font-body); font-size:14px;
+    margin-bottom:16px; text-align:center; letter-spacing:8px; }
+  input:focus { outline:none; border-color:var(--gold); }
+  button { width:100%; padding:10px; background:transparent; border:1px solid var(--gold);
+    color:var(--gold); font-family:var(--font-body); font-size:13px; text-transform:uppercase;
+    letter-spacing:2px; cursor:pointer; border-radius:4px; transition:all 150ms; }
+  button:hover { background:var(--gold); color:var(--bg-deep); }
+  .error { color:var(--danger); font-size:12px; margin-bottom:12px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>PFM</h1>
+  <div class="sub">Personal Financial Manager</div>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  <form method="POST">
+    <input type="password" name="pin" placeholder="PIN" autofocus>
+    <button type="submit">Unlock</button>
+  </form>
+</div>
+</body>
+</html>
