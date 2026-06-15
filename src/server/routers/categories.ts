@@ -6,7 +6,7 @@ import { sumMoney, toScaled } from "@/lib/money";
 
 import { defineAction } from "../actions/defineAction";
 import { publicProcedure, router } from "../trpc";
-import { moneyString } from "../validators";
+import { isoDate, moneyString } from "../validators";
 
 const txnRef = {
   sourceSchema: z.string().min(1),
@@ -67,6 +67,7 @@ export const categoriesRouter = router({
     name: "categorize",
     input: z.object({
       ...txnRef,
+      txnDate: isoDate,
       categoryId: z.string().uuid(),
       amount: moneyString,
       note: z.string().max(500).optional(),
@@ -86,6 +87,7 @@ export const categoriesRouter = router({
         .values({
           sourceSchema: input.sourceSchema,
           sourceTxnId: input.sourceTxnId,
+          txnDate: input.txnDate,
           categoryId: input.categoryId,
           amount: input.amount,
           note: input.note,
@@ -104,6 +106,7 @@ export const categoriesRouter = router({
     input: z
       .object({
         ...txnRef,
+        txnDate: isoDate,
         total: moneyString,
         splits: z.array(splitSchema).min(2),
       })
@@ -133,6 +136,7 @@ export const categoriesRouter = router({
           input.splits.map((s) => ({
             sourceSchema: input.sourceSchema,
             sourceTxnId: input.sourceTxnId,
+            txnDate: input.txnDate,
             categoryId: s.categoryId,
             amount: s.amount,
             note: s.note,

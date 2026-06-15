@@ -1,4 +1,4 @@
-import { index, text, uuid } from "drizzle-orm/pg-core";
+import { date, index, text, uuid } from "drizzle-orm/pg-core";
 
 import { category } from "./category";
 import { financialmanager } from "./_schema";
@@ -24,11 +24,18 @@ export const transactionCategory = financialmanager.table(
       .references(() => category.id),
     /** Portion of the txn assigned to this category (supports splits). */
     amount: money("amount").notNull(),
+    /**
+     * The source transaction's date, denormalized at categorize time for
+     * period reporting (budgets / cash flow). The authoritative reference stays
+     * (source_schema, source_txn_id); this is a recomputable convenience.
+     */
+    txnDate: date("txn_date").notNull(),
     note: text("note"),
     ...timestamps,
   },
   (t) => [
     index("transaction_category_source_idx").on(t.sourceSchema, t.sourceTxnId),
+    index("transaction_category_date_idx").on(t.txnDate),
   ],
 );
 

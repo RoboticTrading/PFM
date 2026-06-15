@@ -1,0 +1,2 @@
+ALTER TABLE "financialmanager"."transaction_category" ADD COLUMN "txn_date" date NOT NULL;--> statement-breakpoint
+CREATE INDEX "transaction_category_date_idx" ON "financialmanager"."transaction_category" USING btree ("txn_date");

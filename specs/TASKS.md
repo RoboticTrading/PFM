@@ -67,7 +67,7 @@ Check off (`[x]`) only when the **gate is green** (typecheck+lint+test+build). E
   gate green; `linkPosition` + the three views tested.
 
 ## Phase 7 — Budgets / Reports / Net worth
-- [ ] **7.1 Budgets** — `setBudget` + `budgetVsActual`. *Done =* gate green.
+- [x] **7.1 Budgets** — `setBudget` + `budgetVsActual`. *Done =* gate green.
 - [ ] **7.2 Reports** — `categoryReport`, `cashFlow`, `netWorth`. *Done =* gate green; report math tested.
 
 ## Phase 8 — Dashboard

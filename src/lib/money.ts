@@ -42,6 +42,11 @@ export function addMoney(a: string, b: string): string {
   return fromScaled(toScaled(a) + toScaled(b));
 }
 
+/** Subtract b from a precisely (a - b). */
+export function subMoney(a: string, b: string): string {
+  return fromScaled(toScaled(a) - toScaled(b));
+}
+
 const USD = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",

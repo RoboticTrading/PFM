@@ -21,6 +21,7 @@ describe("splitTransaction validation (no DB)", () => {
       call.categories.splitTransaction({
         sourceSchema: TEST_SCHEMA,
         sourceTxnId: TEST_TXN,
+        txnDate: "2026-05-01",
         total: "-100.0000",
         splits: [
           { categoryId: "00000000-0000-0000-0000-000000000001", amount: "-60.00" },
@@ -61,6 +62,7 @@ describeDb("categorize / splitTransaction (live MyDB)", () => {
     await call.categories.categorize({
       sourceSchema: TEST_SCHEMA,
       sourceTxnId: TEST_TXN,
+      txnDate: "2026-05-01",
       categoryId: groceries,
       amount: "-82.10",
     });
@@ -79,6 +81,7 @@ describeDb("categorize / splitTransaction (live MyDB)", () => {
     await call.categories.categorize({
       sourceSchema: TEST_SCHEMA,
       sourceTxnId: TEST_TXN,
+      txnDate: "2026-05-01",
       categoryId: dining,
       amount: "-82.10",
     });
@@ -97,6 +100,7 @@ describeDb("categorize / splitTransaction (live MyDB)", () => {
     await call.categories.splitTransaction({
       sourceSchema: TEST_SCHEMA,
       sourceTxnId: TEST_TXN,
+      txnDate: "2026-05-01",
       total: "-100.00",
       splits: [
         { categoryId: groceries, amount: "-60.00", note: "food" },
