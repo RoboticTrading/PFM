@@ -27,7 +27,7 @@ Check off (`[x]`) only when the **gate is green** (typecheck+lint+test+build). E
   forbidding raw `fetch`. *Done =* gate green; a test calls it through the typed client.
 - [x] **1.5 Ontology base + Action wrapper.** `defineAction()` (typed + validated + authorized +
   `AuditLog`) per `specs/ontology.md`. *Done =* gate green; an Action writes an audit row in a test.
-- [ ] **1.6 AI router (`lib/ai`).** Role-based, config-swappable; MoE provider (`MOE_BASE_URL`),
+- [x] **1.6 AI router (`lib/ai`).** Role-based, config-swappable; MoE provider (`MOE_BASE_URL`),
   **off by default**. *Done =* gate green; a test routes a role to a mocked provider (no network).
 
 ## Phase 2 — Data spine

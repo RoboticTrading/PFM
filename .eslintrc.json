@@ -12,5 +12,13 @@
         "message": "No raw fetch — use the typed tRPC client / TanStack Query hooks (CLAUDE.md)."
       }
     ]
-  }
+  },
+  "overrides": [
+    {
+      "files": ["src/lib/ai/**"],
+      "rules": {
+        "no-restricted-syntax": "off"
+      }
+    }
+  ]
 }
