@@ -29,6 +29,7 @@ function createClient(): ReturnType<typeof postgres> {
   // search_path → financialmanager first; source schemas read-only by role.
   return postgres(url, {
     max: 10,
+    onnotice: () => {},
     connection: { search_path: "financialmanager, public" },
   });
 }

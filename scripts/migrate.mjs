@@ -51,7 +51,7 @@ async function main() {
   const journal = JSON.parse(readFileSync(journalPath, "utf8"));
   const entries = [...journal.entries].sort((a, b) => a.idx - b.idx);
 
-  const sql = postgres(url, { max: 1 });
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
   try {
     await sql.unsafe(
       `CREATE TABLE IF NOT EXISTS "${MIGRATIONS_SCHEMA}"."${JOURNAL_TABLE}" (

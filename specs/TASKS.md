@@ -31,7 +31,7 @@ Check off (`[x]`) only when the **gate is green** (typecheck+lint+test+build). E
   **off by default**. *Done =* gate green; a test routes a role to a mocked provider (no network).
 
 ## Phase 2 — Data spine
-- [ ] **2.1 `financialmanager` schema** (on MyDB; `pfm` owns it) — `Institution`, `Account` (config-driven),
+- [x] **2.1 `financialmanager` schema** (on MyDB; `pfm` owns it) — `Institution`, `Account` (config-driven),
   `BalanceForward`, `Category` (Income/Expense/Transfer + ~12 seeds), `TransactionCategory` (link by
   `source_txn_id`, no copy), `Payee`, `Budget`, `Position`/`PositionLeg`, `PositionLink`,
   `ImportBatch`, `AuditLog`. *Done =* gate green; migration applies to `financialmanager` on MyDB; schema tests pass.
