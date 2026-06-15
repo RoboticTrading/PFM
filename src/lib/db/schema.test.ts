@@ -83,9 +83,12 @@ describeDb("financialmanager schema (live MyDB)", () => {
         name: "Brokerage (test)",
         kind: "brokerage",
         // Synthetic source key so it can't collide with the seeded registry's
-        // account_source_unique (schema, view) natural key.
+        // account_source_unique (schema, view) natural key. Marked inactive so
+        // netWorth (active-only) never tries to sum over this non-existent view
+        // if another suite runs concurrently against the same MyDB.
         sourceSchema: "schwab_brokerage",
         sourceView: "v_test_roundtrip_only",
+        active: false,
         columnMapping: mapping,
       })
       .returning();
@@ -95,6 +98,6 @@ describeDb("financialmanager schema (live MyDB)", () => {
       .from(schema.account)
       .where(eq(schema.account.id, acct.id));
     expect(fetched[0].columnMapping).toEqual(mapping);
-    expect(fetched[0].active).toBe(true);
+    expect(fetched[0].active).toBe(false);
   });
 });
