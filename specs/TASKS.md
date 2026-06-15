@@ -63,7 +63,7 @@ Check off (`[x]`) only when the **gate is green** (typecheck+lint+test+build). E
 ## Phase 6 — Positions (fills → positions)
 - [x] **6.1 `pairFillsIntoPosition`** + `Position`/`PositionLeg` (instrument class + trade-structure
   taxonomy). *Done =* gate green; pairing fills produces a position in a test.
-- [ ] **6.2 Link to `trade_analysis.position_history`** + unmatched / open / history views. *Done =*
+- [x] **6.2 Link to `trade_analysis.position_history`** + unmatched / open / history views. *Done =*
   gate green; `linkPosition` + the three views tested.
 
 ## Phase 7 — Budgets / Reports / Net worth

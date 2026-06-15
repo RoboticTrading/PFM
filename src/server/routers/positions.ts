@@ -1,12 +1,23 @@
-import { asc, eq } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
+import { asc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { listPositionHistory } from "@/lib/db/read-models";
+import { positionHistory } from "@/lib/db/read-models/schemas";
 
 import { defineAction } from "../actions/defineAction";
 import { publicProcedure, router } from "../trpc";
 import { isoDate, moneyString } from "../validators";
+
+const pfmPositionColumns = {
+  id: schema.position.id,
+  symbol: schema.position.symbol,
+  instrumentClass: schema.position.instrumentClass,
+  structureType: schema.position.structureType,
+  status: schema.position.status,
+  openedAt: schema.position.openedAt,
+};
 
 const legInput = z.object({
   sourceSchema: z.string().min(1).default("schwab_brokerage"),
@@ -29,18 +40,33 @@ export const positionsRouter = router({
     )
     .query(({ input }) => listPositionHistory(input)),
 
-  /** PFM's own paired positions, newest open first. */
+  /** PFM's own paired positions, symbol-ordered. */
   list: publicProcedure.query(async () => {
     return getDb()
-      .select({
-        id: schema.position.id,
-        symbol: schema.position.symbol,
-        instrumentClass: schema.position.instrumentClass,
-        structureType: schema.position.structureType,
-        status: schema.position.status,
-        openedAt: schema.position.openedAt,
-      })
+      .select(pfmPositionColumns)
       .from(schema.position)
+      .orderBy(asc(schema.position.symbol));
+  }),
+
+  /** Open PFM positions (status = open). */
+  open: publicProcedure.query(async () => {
+    return getDb()
+      .select(pfmPositionColumns)
+      .from(schema.position)
+      .where(eq(schema.position.status, "open"))
+      .orderBy(asc(schema.position.symbol));
+  }),
+
+  /** PFM positions not yet linked to a trade_analysis.position_history row. */
+  unmatched: publicProcedure.query(async () => {
+    return getDb()
+      .select(pfmPositionColumns)
+      .from(schema.position)
+      .leftJoin(
+        schema.positionLink,
+        eq(schema.positionLink.positionId, schema.position.id),
+      )
+      .where(isNull(schema.positionLink.id))
       .orderBy(asc(schema.position.symbol));
   }),
 
@@ -107,6 +133,40 @@ export const positionsRouter = router({
         .returning();
 
       return { positionId: position.id, legCount: legs.length };
+    },
+  }),
+
+  /**
+   * Link a PFM Position to a trade_analysis.position_history row (read-only
+   * source). Verifies the source row exists; stores only the reference.
+   */
+  linkPosition: defineAction({
+    name: "linkPosition",
+    input: z.object({
+      positionId: z.string().uuid(),
+      positionHistoryId: z.string().uuid(),
+    }),
+    target: (input) => input.positionId,
+    handler: async ({ input, tx }) => {
+      const found = await tx
+        .select({ id: positionHistory.positionId })
+        .from(positionHistory)
+        .where(eq(positionHistory.positionId, input.positionHistoryId))
+        .limit(1);
+      if (found.length === 0) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `position_history ${input.positionHistoryId} not found.`,
+        });
+      }
+      const [row] = await tx
+        .insert(schema.positionLink)
+        .values({
+          positionId: input.positionId,
+          positionHistoryId: input.positionHistoryId,
+        })
+        .returning();
+      return row;
     },
   }),
 });

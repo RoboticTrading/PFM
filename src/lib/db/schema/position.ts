@@ -1,4 +1,4 @@
-import { bigint, date, index, text, uuid } from "drizzle-orm/pg-core";
+import { date, index, text, uuid } from "drizzle-orm/pg-core";
 
 import { financialmanager } from "./_schema";
 import { money, timestamps } from "./columns";
@@ -64,10 +64,8 @@ export const positionLink = financialmanager.table(
     positionId: uuid("position_id")
       .notNull()
       .references(() => position.id, { onDelete: "cascade" }),
-    /** PK in trade_analysis.position_history. */
-    positionHistoryId: bigint("position_history_id", {
-      mode: "number",
-    }).notNull(),
+    /** PK (uuid) in trade_analysis.position_history. */
+    positionHistoryId: uuid("position_history_id").notNull(),
     ...timestamps,
   },
   (t) => [index("position_link_position_idx").on(t.positionId)],
