@@ -3,6 +3,9 @@ export {
   listBankTransactions,
   listTradeTransactions,
   listNontradeTransactions,
+  toCanonicalBankTxn,
+  toCanonicalTrade,
+  toCanonicalNontrade,
   type CanonicalTxn,
 } from "./transactions";
 export {

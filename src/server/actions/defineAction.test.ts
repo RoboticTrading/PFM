@@ -2,7 +2,8 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { getDb, getSql, hasDatabaseUrl, schema } from "@/lib/db";
+import { describeDb } from "@/test/db";
+import { getDb, getSql, schema } from "@/lib/db";
 
 import { createContext } from "../context";
 import { createCallerFactory, router } from "../trpc";
@@ -32,8 +33,6 @@ describe("defineAction authorization", () => {
     await expect(call.denied({ value: "x" })).rejects.toThrow(/denied/i);
   });
 });
-
-const describeDb = hasDatabaseUrl() ? describe : describe.skip;
 
 describeDb("defineAction audit (live MyDB)", () => {
   afterAll(async () => {

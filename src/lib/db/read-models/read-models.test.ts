@@ -1,13 +1,13 @@
 import { sql } from "drizzle-orm";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, expect, it } from "vitest";
 
-import { getDb, getSql, hasDatabaseUrl } from "../index";
+import { describeDb } from "@/test/db";
+
+import { getDb, getSql } from "../index";
 import { listBankTransactions } from "./transactions";
 import { listNontradeTransactions, listTradeTransactions } from "./transactions";
 import { listPositionHistory } from "./positions";
 import type { CanonicalTxn } from "./transactions";
-
-const describeDb = hasDatabaseUrl() ? describe : describe.skip;
 
 function assertCanonical(rows: CanonicalTxn[]): void {
   expect(Array.isArray(rows)).toBe(true);

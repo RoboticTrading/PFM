@@ -1,10 +1,10 @@
 import { eq, inArray, sql } from "drizzle-orm";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, expect, it } from "vitest";
 
-import { getDb, getSql, hasDatabaseUrl, schema } from "./index";
+import { describeDb } from "@/test/db";
+
+import { getDb, getSql, schema } from "./index";
 import { seedCategories } from "./seed";
-
-const describeDb = hasDatabaseUrl() ? describe : describe.skip;
 
 const EXPECTED_TABLES = [
   "audit_log",

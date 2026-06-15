@@ -38,7 +38,7 @@ Check off (`[x]`) only when the **gate is green** (typecheck+lint+test+build). E
 - [x] **2.2 Read-models (READ-ONLY) for existing schemas** — typed wrappers over
   `schwab_brokerage.v_trade/v_nontrade_transactions`, `schwab_checking`/4 credit-card `v_transactions`,
   `trade_analysis.position_history`. *Done =* gate green; read-model types compile; queries tested.
-- [ ] **2.3 DB test strategy.** DB-touching tests run against MyDB **locally** (the loop's machine
+- [x] **2.3 DB test strategy.** DB-touching tests run against MyDB **locally** (the loop's machine
   reaches `data02`) and **skip cleanly in CI**. Add minimal fixtures only where a pure unit test
   benefits. *Done =* gate green locally and in CI (DB tests skipped in CI); a read-model test passes.
 

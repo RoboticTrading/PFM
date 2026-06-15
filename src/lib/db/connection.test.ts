@@ -1,9 +1,8 @@
 import { afterAll, describe, expect, it } from "vitest";
 
-import { dbHealth, getSql, hasDatabaseUrl } from "./index";
+import { describeDb } from "@/test/db";
 
-// Runs against live MyDB locally; skips cleanly in CI (no DATABASE_URL).
-const describeDb = hasDatabaseUrl() ? describe : describe.skip;
+import { dbHealth, getSql, hasDatabaseUrl } from "./index";
 
 describeDb("MyDB connectivity (pfm role)", () => {
   afterAll(async () => {
