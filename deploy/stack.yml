@@ -2,8 +2,9 @@
 #
 # Deployed by .github/workflows/deploy.yml on every push to main (self-hosted
 # runner on the swarm). App env (DATABASE_URL as the least-privilege pfm role,
-# PFM_PIN, PFM_SESSION_SECRET, CLOUDFLARE_API_TOKEN, optional MOE_*) is sourced
-# at deploy time from /mnt/qnap/config/pfm.env on the manager — NEVER committed.
+# CLOUDFLARE_API_TOKEN for the TLS sidecar, optional MOE_*) is sourced at deploy
+# time from /mnt/qnap/config/pfm.env on the manager — NEVER committed. There is
+# no app-level auth: PFM is single-user and LAN-isolated (see exposure below).
 # The financialmanager schema already lives on MyDB; no schema step here.
 #
 # Exposure: the `pfm` app stays INTERNAL (algobots_ingress only). A dedicated
@@ -26,8 +27,6 @@ services:
       # MyDB as the pfm role (host data02 resolves on the algobots_ingress
       # overlay). Sourced from /mnt/qnap/config/pfm.env at deploy time.
       DATABASE_URL: ${DATABASE_URL}
-      PFM_PIN: ${PFM_PIN}
-      PFM_SESSION_SECRET: ${PFM_SESSION_SECRET}
       # Optional $0 MoE categorize — off by default.
       MOE_BASE_URL: ${MOE_BASE_URL:-}
       AI_ENABLED: ${AI_ENABLED:-false}
