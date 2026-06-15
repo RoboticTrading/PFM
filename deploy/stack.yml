@@ -1,0 +1,40 @@
+# PFM — Docker Swarm stack (LAN-only behind the shared Caddy).
+# One-time [HUMAN] (TASKS 11.2): `docker stack deploy -c deploy/stack.yml pfm`
+# on a swarm manager, then add the Caddy block + the LAN-only
+# pfm.bolivardrive.com DNS record (→ private IP). NEVER expose to the public
+# internet — financial data on the LAN.
+#
+# Secrets (DATABASE_URL as the pfm role, PFM_PIN, PFM_SESSION_SECRET, optional
+# MOE_*) are provided via swarm secrets / an env file on the manager — never
+# committed. The financialmanager schema already lives on MyDB.
+
+version: "3.8"
+
+services:
+  pfm:
+    image: ghcr.io/bobshobert/pfm:latest
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+    # Provide secrets at deploy time, e.g. `--env-file pfm.env` is NOT supported
+    # by `stack deploy`; use swarm secrets or set env on the manager and
+    # reference here. Keep DATABASE_URL etc. OUT of git.
+    env_file:
+      - pfm.env
+    networks:
+      - caddy
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+      update_config:
+        order: start-first
+      labels:
+        # Routed by the shared Caddy at pfm.bolivardrive.com (LAN-only DNS).
+        caddy: pfm.bolivardrive.com
+        caddy.reverse_proxy: "{{upstreams 3000}}"
+
+networks:
+  caddy:
+    external: true

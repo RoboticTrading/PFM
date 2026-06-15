@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.github
+coverage
+docs
+templates
+static
+serve.py
+**/*.test.ts
+**/*.test.tsx
+*.md
+.env
+.env*.local
+.DS_Store
+Dockerfile
+.dockerignore
