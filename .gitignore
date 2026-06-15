@@ -1,0 +1,15 @@
+# node / next
+/node_modules
+/.next/
+/out/
+*.tsbuildinfo
+/coverage
+# env — NEVER commit real secrets
+.env
+.env*.local
+# python (old flask mvp reference)
+__pycache__/
+*.py[cod]
+.venv/
+# os
+.DS_Store
