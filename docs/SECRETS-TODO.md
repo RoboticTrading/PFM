@@ -1,38 +1,42 @@
 # One-time human steps (secrets / external deps)
 
-The loop builds everything it can autonomously. These steps need a human +
-real secrets/hardware and are intentionally left out of git.
+## ✅ DONE — first deploy + routing (TASK 11.2), completed 2026-06-15
 
-## Verify the image builds locally (TASK 11.1)
-The build agent's machine had **no running Docker daemon** (CLI present, daemon
-down), so it could not run `docker build`. The `Dockerfile`, `.dockerignore`,
-CI/deploy workflows, and `deploy/stack.yml` are written and YAML-valid. Verify
-once on a machine with Docker:
+PFM is deployed to the Swarm and reachable LAN-only at:
 
-```
-docker build -t pfm:local .
-# optional smoke test (needs DATABASE_URL to MyDB as the pfm role):
-docker run --rm -p 3000:3000 --env-file .env.local pfm:local
-```
+    https://pfm.bolivardrive.com:8443
 
-## Deploy secrets (TASK 11.2 — first deploy, [HUMAN])
-GitHub repo secrets for `.github/workflows/deploy.yml`:
-- `SWARM_SSH_HOST` — a swarm manager (LAN IP).
-- `SWARM_SSH_USER` — deploy user.
-- `SWARM_SSH_KEY` — that user's private key.
-- (GHCR push uses the built-in `GITHUB_TOKEN`.)
+### How it actually ships (reconciled to the real cluster)
+- **Image:** `registry.prop-desk.io/pfm:latest` (the LAN registry, not GHCR).
+- **CI/CD:** push to `main` → `.github/workflows/deploy.yml`: cloud `gate`
+  (typecheck/lint/test/build) → self-hosted `build-and-deploy` on swarm1
+  (`docker build` → push → `docker stack deploy`). The runner is
+  `actions.runner.RoboticTrading-PFM.swarm1-pfm` (systemd, on swarm1).
+  `ci.yml` is PR-only so the gate isn't duplicated on push.
+- **App env:** owner-only at `/mnt/qnap/config/pfm.env` (DATABASE_URL as the
+  least-privilege `pfm` role, PFM_PIN, PFM_SESSION_SECRET, CLOUDFLARE_API_TOKEN,
+  optional MOE_*). Never committed; sourced at deploy time.
 
-On the swarm manager, provide app env (NEVER commit) as `pfm.env` next to the
-stack, or as swarm secrets:
-- `DATABASE_URL` — MyDB as the least-privilege `pfm` role.
-- `PFM_PIN` — the LAN PIN gate.
-- `PFM_SESSION_SECRET` — long random string for the session cookie.
-- `MOE_BASE_URL` / `AI_ENABLED` — optional AI (off by default).
+### LAN-only exposure (financial data — never public)
+The shared cluster Caddy is **ingress-mode** (SNATs client IPs, can't IP-filter)
+and its certs leak hostnames via CT logs, so PFM is **NOT** on it. Instead:
+- the `pfm` app stays internal (algobots_ingress only);
+- a dedicated `caddy-cloudflare` **sidecar** (in `deploy/stack.yml`) publishes
+  TLS in **host mode on swarm1:8443** — swarm1 has no public NIC and the router
+  forwards nothing there, so it's physically unreachable from the internet.
+  Cert via Cloudflare DNS-01 (config: `/mnt/qnap/caddy/pfm.Caddyfile`).
+- DNS: a Cloudflare **grey-cloud** A record `pfm.bolivardrive.com → 192.168.42.121`
+  (DNS-only; a private, non-routable IP).
 
-First deploy:
-```
-docker stack deploy -c deploy/stack.yml pfm     # on a swarm manager
-```
-Then add the Caddy block + the **LAN-only** `pfm.bolivardrive.com` DNS record
-(→ private/LAN IP). **Never expose to the public internet.** The
-`financialmanager` schema already lives on MyDB; no schema step needed.
+### ⚠️ Follow-up — rotate the Cloudflare API token
+During deploy, Caddy echoed the cluster ACME token into its logs (captured in a
+Claude session transcript). It is the shared `CLOUDFLARE_API_TOKEN` used by the
+main Caddy + this sidecar. Rotate it: create a new Cloudflare token (Zone:DNS
+Edit for the relevant zones), update `/mnt/qnap/config/caddy.env` +
+`/mnt/qnap/config/pfm.env`, then `docker service update --force caddy_caddy`
+and `docker stack deploy ... pfm`.
+
+## Verify the image builds locally (TASK 11.1) — superseded
+The self-hosted runner now builds the image on every push, so the local
+`docker build` is no longer the only path. (The build agent's box had no Docker
+daemon, which is why 11.1 was deferred.)
