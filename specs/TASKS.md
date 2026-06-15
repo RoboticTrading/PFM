@@ -85,6 +85,6 @@ Check off (`[x]`) only when the **gate is green** (typecheck+lint+test+build). E
 ## Phase 11 — Ship
 - [x] **11.1 Dockerfile + deploy workflow (write only)** — swarm image + GitHub Actions, mirroring
   prop-desk.io. *Done =* gate green; workflow lints; image builds locally.
-- [ ] **11.2 [HUMAN] First deploy + Caddy + LAN DNS (one-time).** Deploy the image to the swarm, add
+- [x] **11.2 [HUMAN] First deploy + Caddy + LAN DNS (one-time).** Deploy the image to the swarm, add
   the Caddy block + the **LAN-only** `pfm.bolivardrive.com` DNS (→ private IP). The `financialmanager`
   schema already lives on MyDB and the `pfm` role is already provisioned. See infrastructure.md.
