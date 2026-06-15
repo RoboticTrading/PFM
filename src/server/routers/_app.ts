@@ -2,9 +2,11 @@ import { dbHealth, hasDatabaseUrl } from "@/lib/db";
 
 import { publicProcedure, router } from "../trpc";
 import { accountsRouter } from "./accounts";
+import { balancesRouter } from "./balances";
 
 export const appRouter = router({
   accounts: accountsRouter,
+  balances: balancesRouter,
   /**
    * Liveness + MyDB reachability. Never throws — DB problems surface as
    * `db.reachable: false` so the cockpit can show a degraded state rather than
