@@ -35,7 +35,7 @@ Check off (`[x]`) only when the **gate is green** (typecheck+lint+test+build). E
   `BalanceForward`, `Category` (Income/Expense/Transfer + ~12 seeds), `TransactionCategory` (link by
   `source_txn_id`, no copy), `Payee`, `Budget`, `Position`/`PositionLeg`, `PositionLink`,
   `ImportBatch`, `AuditLog`. *Done =* gate green; migration applies to `financialmanager` on MyDB; schema tests pass.
-- [ ] **2.2 Read-models (READ-ONLY) for existing schemas** — typed wrappers over
+- [x] **2.2 Read-models (READ-ONLY) for existing schemas** — typed wrappers over
   `schwab_brokerage.v_trade/v_nontrade_transactions`, `schwab_checking`/4 credit-card `v_transactions`,
   `trade_analysis.position_history`. *Done =* gate green; read-model types compile; queries tested.
 - [ ] **2.3 DB test strategy.** DB-touching tests run against MyDB **locally** (the loop's machine
