@@ -50,7 +50,7 @@ Check off (`[x]`) only when the **gate is green** (typecheck+lint+test+build). E
 ## Phase 4 — Transactions + categorization (the core)
 - [x] **4.1 Transaction register** — the artifact-centric table over the read-models (sortable, dense,
   Quicken-style). *Done =* gate green; renders a register from fixtures; component tests.
-- [ ] **4.2 `categorize` / `splitTransaction`** Actions + category hierarchy (reference `source_txn_id`,
+- [x] **4.2 `categorize` / `splitTransaction`** Actions + category hierarchy (reference `source_txn_id`,
   no copy). *Done =* gate green; categorize + split tested; lineage preserved.
 - [ ] **4.3 Filters / facets** on the register (account, date, category, payee, amount). *Done =* gate green.
 

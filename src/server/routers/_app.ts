@@ -3,11 +3,13 @@ import { dbHealth, hasDatabaseUrl } from "@/lib/db";
 import { publicProcedure, router } from "../trpc";
 import { accountsRouter } from "./accounts";
 import { balancesRouter } from "./balances";
+import { categoriesRouter } from "./categories";
 import { transactionsRouter } from "./transactions";
 
 export const appRouter = router({
   accounts: accountsRouter,
   balances: balancesRouter,
+  categories: categoriesRouter,
   transactions: transactionsRouter,
   /**
    * Liveness + MyDB reachability. Never throws — DB problems surface as

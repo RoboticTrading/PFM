@@ -5,13 +5,7 @@ import { schema } from "@/lib/db";
 
 import { defineAction } from "../actions/defineAction";
 import { publicProcedure, router } from "../trpc";
-
-const moneyString = z
-  .string()
-  .regex(/^-?\d+(\.\d+)?$/, "amount must be a decimal string");
-const isoDate = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "asOfDate must be YYYY-MM-DD");
+import { isoDate, moneyString } from "../validators";
 
 export const balancesRouter = router({
   /** Set (or update) the known balance for an account as of a date. */
