@@ -6,6 +6,7 @@ import { balancesRouter } from "./balances";
 import { budgetsRouter } from "./budgets";
 import { categoriesRouter } from "./categories";
 import { positionsRouter } from "./positions";
+import { reportsRouter } from "./reports";
 import { transactionsRouter } from "./transactions";
 
 export const appRouter = router({
@@ -14,6 +15,7 @@ export const appRouter = router({
   budgets: budgetsRouter,
   categories: categoriesRouter,
   positions: positionsRouter,
+  reports: reportsRouter,
   transactions: transactionsRouter,
   /**
    * Liveness + MyDB reachability. Never throws — DB problems surface as
