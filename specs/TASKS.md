@@ -58,7 +58,7 @@ Check off (`[x]`) only when the **gate is green** (typecheck+lint+test+build). E
 - [x] **5.1 Artifact-centric app shell** — object nav, dense tables, drill-ins, detail panes,
   keyboard-friendly. The Explorer IS the UX. *Done =* gate green; navigate accounts↔transactions↔
   categories↔positions via drill-ins; tests.
-- [ ] **5.2 [REVIEW] Explorer design pass** (Walnut & Brass, dense cockpit).
+- [x] **5.2 [REVIEW] Explorer design pass** (Walnut & Brass, dense cockpit).
 
 ## Phase 6 — Positions (fills → positions)
 - [ ] **6.1 `pairFillsIntoPosition`** + `Position`/`PositionLeg` (instrument class + trade-structure
