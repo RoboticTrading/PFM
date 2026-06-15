@@ -41,3 +41,14 @@ export function sumMoney(values: Array<string | null | undefined>): string {
 export function addMoney(a: string, b: string): string {
   return fromScaled(toScaled(a) + toScaled(b));
 }
+
+const USD = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
+
+/** Format a money string as USD for display, e.g. "-$1,234.56". */
+export function formatUsd(value: string): string {
+  const n = Number(value);
+  return Number.isFinite(n) ? USD.format(n) : value;
+}

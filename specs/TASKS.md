@@ -45,7 +45,7 @@ Check off (`[x]`) only when the **gate is green** (typecheck+lint+test+build). E
 ## Phase 3 — Accounts
 - [x] **3.1 Account registry** (config-driven: source schema/view/column-mapping). *Done =* gate green.
 - [x] **3.2 Balance-forward + `accountBalance`.** *Done =* gate green; balance math tested.
-- [ ] **3.3 Accounts Explorer** (list + detail, dense). *Done =* gate green; **design `[REVIEW]`**.
+- [x] **3.3 Accounts Explorer** (list + detail, dense). *Done =* gate green; **design `[REVIEW]`**.
 
 ## Phase 4 — Transactions + categorization (the core)
 - [ ] **4.1 Transaction register** — the artifact-centric table over the read-models (sortable, dense,
