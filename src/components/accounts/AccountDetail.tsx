@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { TransactionRegister } from "@/components/transactions/TransactionRegister";
 import { formatUsd } from "@/lib/money";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
@@ -76,6 +77,15 @@ export function AccountDetail({ id }: { id: string }) {
           }
         />
       </dl>
+
+      <section>
+        <h2 className="mb-2 font-display text-lg font-semibold text-fg">
+          Register
+        </h2>
+        <div className="rounded-md border border-border bg-surface">
+          <TransactionRegister accountId={id} />
+        </div>
+      </section>
 
       <Link
         href="/accounts"
