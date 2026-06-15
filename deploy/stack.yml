@@ -1,15 +1,17 @@
-# PFM — Docker Swarm stack (LAN-only behind the shared Caddy).
+# PFM — Docker Swarm stack. LAN-ONLY, never public (financial data).
 #
 # Deployed by .github/workflows/deploy.yml on every push to main (self-hosted
 # runner on the swarm). App env (DATABASE_URL as the least-privilege pfm role,
-# PFM_PIN, PFM_SESSION_SECRET, optional MOE_*) is sourced at deploy time from
-# /mnt/qnap/config/pfm.env on the manager — NEVER committed. The
-# financialmanager schema already lives on MyDB; no schema step here.
+# PFM_PIN, PFM_SESSION_SECRET, CLOUDFLARE_API_TOKEN, optional MOE_*) is sourced
+# at deploy time from /mnt/qnap/config/pfm.env on the manager — NEVER committed.
+# The financialmanager schema already lives on MyDB; no schema step here.
 #
-# Routing is via the shared manual Caddyfile (/mnt/qnap/caddy/Caddyfile), NOT
-# caddy-docker-proxy labels. The pfm.bolivardrive.com block carries a private-
-# IP remote_ip guard so the app is unreachable from the public internet even
-# though it shares the Caddy ingress. Financial data — LAN-only, never public.
+# Exposure: the `pfm` app stays INTERNAL (algobots_ingress only). A dedicated
+# Caddy sidecar publishes TLS in HOST mode on swarm1:8443 — swarm1 has no public
+# NIC and the router forwards nothing there, so PFM is physically unreachable
+# from the internet. It is NOT on the shared public ingress Caddy. Reach it at
+# https://pfm.bolivardrive.com:8443 (DNS = Cloudflare grey-cloud A -> the LAN IP
+# 192.168.42.121). Cert via Cloudflare DNS-01, so no inbound 80/443 is needed.
 version: "3.8"
 
 services:
@@ -19,7 +21,7 @@ services:
       NODE_ENV: production
       PORT: "3000"
       # Next standalone binds the container hostname by default; bind all
-      # interfaces so Caddy + healthchecks can reach it.
+      # interfaces so the sidecar can reach it.
       HOSTNAME: "0.0.0.0"
       # MyDB as the pfm role (host data02 resolves on the algobots_ingress
       # overlay). Sourced from /mnt/qnap/config/pfm.env at deploy time.
@@ -38,6 +40,35 @@ services:
       restart_policy:
         condition: any
 
+  # LAN-only TLS front. Host-mode 8443 on swarm1's LAN NIC only — no public
+  # route exists to it. Config + cert token live owner-only on the cluster.
+  caddy:
+    image: ghcr.io/caddybuilds/caddy-cloudflare:latest
+    environment:
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
+    ports:
+      - target: 443
+        published: 8443
+        protocol: tcp
+        mode: host
+    volumes:
+      - /mnt/qnap/caddy/pfm.Caddyfile:/etc/caddy/Caddyfile:ro
+      - pfm_caddy_data:/data
+    networks:
+      - algobots_ingress
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          # Pin to swarm1 so the host port + cert storage are deterministic.
+          - node.hostname == swarm1
+      restart_policy:
+        condition: any
+
 networks:
   algobots_ingress:
     external: true
+
+volumes:
+  pfm_caddy_data:
+    driver: local

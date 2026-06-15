@@ -1,8 +1,8 @@
 name: ci
 
+# PR checks only. Pushes to main are gated + deployed by deploy.yml (which runs
+# the same gate), so triggering here on push would just duplicate that gate.
 on:
-  push:
-    branches: [main]
   pull_request:
 
 jobs:
