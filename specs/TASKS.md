@@ -75,7 +75,7 @@ Check off (`[x]`) only when the **gate is green** (typecheck+lint+test+build). E
   green; component tests; **design `[REVIEW]`**.
 
 ## Phase 9 — AI categorize (optional)
-- [ ] **9.1 MoE auto-suggest + insights** via `lib/ai`, **off by default**; suggests only, human
+- [x] **9.1 MoE auto-suggest + insights** via `lib/ai`, **off by default**; suggests only, human
   confirms (never auto-writes). *Done =* gate green; suggestion path tested with a mocked MoE.
 
 ## Phase 10 — Auth

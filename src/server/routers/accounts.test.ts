@@ -1,6 +1,6 @@
 import { afterAll, expect, it } from "vitest";
 
-import { getDb, getSql } from "@/lib/db";
+import { getDb, getSql, schema } from "@/lib/db";
 import { seedAccounts } from "@/lib/db/seed";
 import { ACCOUNTS } from "@/lib/accounts/registry";
 import { describeDb } from "@/test/db";
@@ -17,10 +17,25 @@ describeDb("accounts registry (live MyDB)", () => {
   });
 
   it("syncs the registry idempotently", async () => {
-    const first = await seedAccounts(getDb());
-    const second = await seedAccounts(getDb());
-    expect(second).toBe(first);
-    expect(second).toBeGreaterThanOrEqual(ACCOUNTS.length);
+    // Seed twice; assert each registry account exists exactly once. (Counting
+    // by natural key is robust to unrelated test accounts created concurrently
+    // by other suites against the same MyDB.)
+    await seedAccounts(getDb());
+    await seedAccounts(getDb());
+    const rows = await getDb()
+      .select({
+        sourceSchema: schema.account.sourceSchema,
+        sourceView: schema.account.sourceView,
+      })
+      .from(schema.account);
+    for (const spec of ACCOUNTS) {
+      const matches = rows.filter(
+        (r) =>
+          r.sourceSchema === spec.sourceSchema &&
+          r.sourceView === spec.sourceView,
+      );
+      expect(matches, `${spec.sourceSchema}.${spec.sourceView}`).toHaveLength(1);
+    }
   });
 
   it("accounts.list returns registry accounts joined with their institution", async () => {

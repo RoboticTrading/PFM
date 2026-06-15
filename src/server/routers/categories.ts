@@ -1,6 +1,7 @@
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { createAiRouter, suggestCategory } from "@/lib/ai";
 import { getDb, schema } from "@/lib/db";
 import { sumMoney, toScaled } from "@/lib/money";
 
@@ -56,6 +57,32 @@ export const categoriesRouter = router({
             eq(schema.transactionCategory.sourceTxnId, input.sourceTxnId),
           ),
         );
+    }),
+
+  /**
+   * AI category suggestion (opt-in). Returns `{ enabled: false }` unless the AI
+   * layer is turned on. Suggest-only: the result is for a human to confirm via
+   * the `categorize` Action — it never writes.
+   */
+  suggest: publicProcedure
+    .input(
+      z.object({
+        description: z.string(),
+        amount: z.string(),
+      }),
+    )
+    .query(async ({ input }) => {
+      const ai = createAiRouter();
+      if (!ai.enabled) return { enabled: false as const, suggestion: null };
+      const categories = await getDb()
+        .select({ id: schema.category.id, name: schema.category.name })
+        .from(schema.category);
+      const suggestion = await suggestCategory(ai, {
+        description: input.description,
+        amount: input.amount,
+        categories,
+      });
+      return { enabled: true as const, suggestion };
     }),
 
   /**

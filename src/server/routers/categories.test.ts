@@ -15,6 +15,17 @@ const call = createCallerFactory(appRouter)(createContext());
 const TEST_SCHEMA = "schwab_checking";
 const TEST_TXN = "__test_txn_categorize";
 
+describe("categories.suggest (AI off by default, no DB)", () => {
+  it("returns enabled:false without touching the DB or network", async () => {
+    const res = await call.categories.suggest({
+      description: "WHOLE FOODS",
+      amount: "-82.10",
+    });
+    expect(res.enabled).toBe(false);
+    expect(res.suggestion).toBeNull();
+  });
+});
+
 describe("splitTransaction validation (no DB)", () => {
   it("rejects splits that don't sum to the total before any DB work", async () => {
     await expect(
