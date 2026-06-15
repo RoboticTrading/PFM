@@ -71,7 +71,7 @@ Check off (`[x]`) only when the **gate is green** (typecheck+lint+test+build). E
 - [x] **7.2 Reports** — `categoryReport`, `cashFlow`, `netWorth`. *Done =* gate green; report math tested.
 
 ## Phase 8 — Dashboard
-- [ ] **8.1 Cockpit dashboard** — balances, cash flow, budget-vs-actual at a glance. *Done =* gate
+- [x] **8.1 Cockpit dashboard** — balances, cash flow, budget-vs-actual at a glance. *Done =* gate
   green; component tests; **design `[REVIEW]`**.
 
 ## Phase 9 — AI categorize (optional)

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** The Explorer is the UX — land on the Accounts artifact spine. */
+/** Land on the cockpit dashboard. */
 export default function Home() {
-  redirect("/accounts");
+  redirect("/dashboard");
 }

@@ -27,3 +27,10 @@ right. Walnut & Brass throughout.
 - `5.2-positions.png` — trade position history (read-only) table.
 
 Press ⌘K anywhere to jump between artifacts.
+
+## 8.1 — Cockpit dashboard
+- `8.1-dashboard.png` — the landing cockpit: Net worth headline + per-account
+  balances, this month's Cash flow (income/expense/net), and Budget vs actual.
+  Real net-worth data; cash flow / budgets are empty until categorizations and
+  budgets exist for the current month. "Dashboard" is now the first nav item and
+  the / landing.

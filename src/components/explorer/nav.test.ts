@@ -16,6 +16,7 @@ describe("activeNav", () => {
 
   it("exposes the artifact spine", () => {
     expect(NAV_ITEMS.map((i) => i.href)).toEqual([
+      "/dashboard",
       "/accounts",
       "/categories",
       "/positions",

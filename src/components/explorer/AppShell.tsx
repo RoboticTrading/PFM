@@ -25,7 +25,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         className="flex w-52 shrink-0 flex-col border-r border-border bg-panel"
       >
         <Link
-          href="/accounts"
+          href="/dashboard"
           className="flex items-center gap-2 border-b border-border px-4 py-4 font-display text-lg font-semibold tracking-wide text-accent"
         >
           PFM
