@@ -23,7 +23,7 @@ Check off (`[x]`) only when the **gate is green** (typecheck+lint+test+build). E
   `.env.local`). Build the `financialmanager` schema **directly on MyDB**. *Done =* gate green;
   `db:generate`/`db:migrate` apply to `financialmanager` on MyDB; a connectivity test passes (skips
   cleanly with no DB in CI).
-- [ ] **1.4 tRPC + TanStack Query.** Typed API + query provider; one `health` procedure; lint rule
+- [x] **1.4 tRPC + TanStack Query.** Typed API + query provider; one `health` procedure; lint rule
   forbidding raw `fetch`. *Done =* gate green; a test calls it through the typed client.
 - [ ] **1.5 Ontology base + Action wrapper.** `defineAction()` (typed + validated + authorized +
   `AuditLog`) per `specs/ontology.md`. *Done =* gate green; an Action writes an audit row in a test.

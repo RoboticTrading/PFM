@@ -1,3 +1,16 @@
 {
-  "extends": "next/core-web-vitals"
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "CallExpression[callee.name='fetch']",
+        "message": "No raw fetch — use the typed tRPC client / TanStack Query hooks (CLAUDE.md)."
+      },
+      {
+        "selector": "MemberExpression[object.name=/^(window|globalThis|global)$/][property.name='fetch']",
+        "message": "No raw fetch — use the typed tRPC client / TanStack Query hooks (CLAUDE.md)."
+      }
+    ]
+  }
 }
