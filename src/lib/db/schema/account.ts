@@ -1,4 +1,4 @@
-import { boolean, jsonb, text, uuid } from "drizzle-orm/pg-core";
+import { boolean, jsonb, text, unique, uuid } from "drizzle-orm/pg-core";
 
 import { financialmanager } from "./_schema";
 import { institution } from "./institution";
@@ -46,7 +46,10 @@ export const account = financialmanager.table("account", {
   columnMapping: jsonb("column_mapping").$type<ColumnMapping>().notNull(),
   active: boolean("active").notNull().default(true),
   ...timestamps,
-});
+}, (t) => [
+  // One PFM account per source view — the natural key for idempotent registry sync.
+  unique("account_source_unique").on(t.sourceSchema, t.sourceView),
+]);
 
 export type Account = typeof account.$inferSelect;
 export type NewAccount = typeof account.$inferInsert;

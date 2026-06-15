@@ -15,6 +15,13 @@
       "when": 1781545328027,
       "tag": "0001_safe_hammerhead",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781546041662,
+      "tag": "0002_parched_electro",
+      "breakpoints": true
     }
   ]
 }

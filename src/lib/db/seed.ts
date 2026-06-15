@@ -1,6 +1,10 @@
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
+import { ACCOUNTS, INSTITUTIONS } from "@/lib/accounts/registry";
+
+import { account } from "./schema/account";
 import { category, type CategoryKind } from "./schema/category";
+import { institution } from "./schema/institution";
 import type * as schema from "./schema";
 
 type Db = PostgresJsDatabase<typeof schema>;
@@ -67,5 +71,49 @@ export async function seedCategories(db: Db): Promise<number> {
   }
 
   const rows = await db.select({ id: category.id }).from(category);
+  return rows.length;
+}
+
+/**
+ * Sync the account registry (institutions + accounts) into MyDB. Idempotent —
+ * upserts by natural key (institution.name, account.source_schema+view).
+ * Returns the number of accounts now present.
+ */
+export async function seedAccounts(db: Db): Promise<number> {
+  for (const inst of INSTITUTIONS) {
+    await db
+      .insert(institution)
+      .values({ name: inst.name, kind: inst.kind })
+      .onConflictDoNothing({ target: institution.name });
+  }
+
+  const institutions = await db
+    .select({ id: institution.id, name: institution.name })
+    .from(institution);
+  const idByName = new Map(institutions.map((i) => [i.name, i.id]));
+
+  for (const spec of ACCOUNTS) {
+    const institutionId = idByName.get(spec.institution);
+    if (!institutionId) {
+      throw new Error(
+        `Account "${spec.name}" references unknown institution "${spec.institution}".`,
+      );
+    }
+    await db
+      .insert(account)
+      .values({
+        institutionId,
+        name: spec.name,
+        kind: spec.kind,
+        sourceSchema: spec.sourceSchema,
+        sourceView: spec.sourceView,
+        columnMapping: spec.columnMapping,
+      })
+      .onConflictDoNothing({
+        target: [account.sourceSchema, account.sourceView],
+      });
+  }
+
+  const rows = await db.select({ id: account.id }).from(account);
   return rows.length;
 }

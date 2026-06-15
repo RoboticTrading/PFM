@@ -7,7 +7,7 @@
  */
 import { loadLocalEnv } from "../src/lib/env";
 import { getDb, getSql } from "../src/lib/db";
-import { seedCategories } from "../src/lib/db/seed";
+import { seedAccounts, seedCategories } from "../src/lib/db/seed";
 
 async function main(): Promise<void> {
   loadLocalEnv();
@@ -16,8 +16,10 @@ async function main(): Promise<void> {
     return;
   }
   try {
-    const count = await seedCategories(getDb());
-    console.log(`categories present: ${count}`);
+    const categories = await seedCategories(getDb());
+    console.log(`categories present: ${categories}`);
+    const accounts = await seedAccounts(getDb());
+    console.log(`accounts present: ${accounts}`);
   } finally {
     await getSql().end({ timeout: 5 });
   }

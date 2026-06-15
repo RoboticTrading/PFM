@@ -1,0 +1,2 @@
+ALTER TABLE "financialmanager"."institution" ADD CONSTRAINT "institution_name_unique" UNIQUE("name");--> statement-breakpoint
+ALTER TABLE "financialmanager"."account" ADD CONSTRAINT "account_source_unique" UNIQUE("source_schema","source_view");

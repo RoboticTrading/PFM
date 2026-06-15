@@ -82,8 +82,10 @@ describeDb("financialmanager schema (live MyDB)", () => {
         institutionId: inst.id,
         name: "Brokerage (test)",
         kind: "brokerage",
+        // Synthetic source key so it can't collide with the seeded registry's
+        // account_source_unique (schema, view) natural key.
         sourceSchema: "schwab_brokerage",
-        sourceView: "v_trade_transactions",
+        sourceView: "v_test_roundtrip_only",
         columnMapping: mapping,
       })
       .returning();

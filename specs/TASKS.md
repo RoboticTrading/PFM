@@ -43,7 +43,7 @@ Check off (`[x]`) only when the **gate is green** (typecheck+lint+test+build). E
   benefits. *Done =* gate green locally and in CI (DB tests skipped in CI); a read-model test passes.
 
 ## Phase 3 — Accounts
-- [ ] **3.1 Account registry** (config-driven: source schema/view/column-mapping). *Done =* gate green.
+- [x] **3.1 Account registry** (config-driven: source schema/view/column-mapping). *Done =* gate green.
 - [ ] **3.2 Balance-forward + `accountBalance`.** *Done =* gate green; balance math tested.
 - [ ] **3.3 Accounts Explorer** (list + detail, dense). *Done =* gate green; **design `[REVIEW]`**.
 
