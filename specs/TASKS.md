@@ -79,7 +79,7 @@ Check off (`[x]`) only when the **gate is green** (typecheck+lint+test+build). E
   confirms (never auto-writes). *Done =* gate green; suggestion path tested with a mocked MoE.
 
 ## Phase 10 — Auth
-- [ ] **10.1 PIN gate.** Local PIN (`PFM_PIN`) gating LAN access. *Done =* gate green; gated route
+- [x] **10.1 PIN gate.** Local PIN (`PFM_PIN`) gating LAN access. *Done =* gate green; gated route
   tested (dev dummy PIN).
 
 ## Phase 11 — Ship

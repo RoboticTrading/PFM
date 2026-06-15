@@ -6,6 +6,8 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
+import { logout } from "@/app/login/actions";
+
 import { CommandMenu } from "./CommandMenu";
 import { activeNav, NAV_ITEMS } from "./nav";
 
@@ -55,9 +57,21 @@ export function AppShell({ children }: { children: ReactNode }) {
             );
           })}
         </ul>
-        <div className="border-t border-border p-3 text-[10px] uppercase tracking-wide text-fg-subtle">
-          <kbd className="rounded border border-border-light bg-elevated px-1">⌘K</kbd>{" "}
-          to jump
+        <div className="flex items-center justify-between border-t border-border p-3 text-[10px] uppercase tracking-wide text-fg-subtle">
+          <span>
+            <kbd className="rounded border border-border-light bg-elevated px-1">
+              ⌘K
+            </kbd>{" "}
+            to jump
+          </span>
+          <form action={logout}>
+            <button
+              type="submit"
+              className="uppercase tracking-wide text-fg-subtle outline-none hover:text-accent focus-visible:text-accent"
+            >
+              Lock
+            </button>
+          </form>
         </div>
       </nav>
 
