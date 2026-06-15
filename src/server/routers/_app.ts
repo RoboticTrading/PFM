@@ -4,12 +4,14 @@ import { publicProcedure, router } from "../trpc";
 import { accountsRouter } from "./accounts";
 import { balancesRouter } from "./balances";
 import { categoriesRouter } from "./categories";
+import { positionsRouter } from "./positions";
 import { transactionsRouter } from "./transactions";
 
 export const appRouter = router({
   accounts: accountsRouter,
   balances: balancesRouter,
   categories: categoriesRouter,
+  positions: positionsRouter,
   transactions: transactionsRouter,
   /**
    * Liveness + MyDB reachability. Never throws — DB problems surface as

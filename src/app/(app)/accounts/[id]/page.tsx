@@ -9,7 +9,7 @@ export default async function AccountPage({
 }) {
   const { id } = await params;
   return (
-    <main className="min-h-screen bg-base px-8 py-6">
+    <main className="px-8 py-6">
       <AccountDetail id={id} />
     </main>
   );

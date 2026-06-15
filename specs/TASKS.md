@@ -55,7 +55,7 @@ Check off (`[x]`) only when the **gate is green** (typecheck+lint+test+build). E
 - [x] **4.3 Filters / facets** on the register (account, date, category, payee, amount). *Done =* gate green.
 
 ## Phase 5 — The Explorer
-- [ ] **5.1 Artifact-centric app shell** — object nav, dense tables, drill-ins, detail panes,
+- [x] **5.1 Artifact-centric app shell** — object nav, dense tables, drill-ins, detail panes,
   keyboard-friendly. The Explorer IS the UX. *Done =* gate green; navigate accounts↔transactions↔
   categories↔positions via drill-ins; tests.
 - [ ] **5.2 [REVIEW] Explorer design pass** (Walnut & Brass, dense cockpit).

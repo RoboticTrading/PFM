@@ -4,7 +4,7 @@ export const metadata = { title: "Accounts — PFM" };
 
 export default function AccountsPage() {
   return (
-    <main className="min-h-screen bg-base px-8 py-6">
+    <main className="px-8 py-6">
       <header className="mb-5">
         <h1 className="font-display text-2xl font-semibold tracking-wide text-accent">
           Accounts
