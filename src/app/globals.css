@@ -63,7 +63,30 @@
   --font-sans: var(--pfm-font-body);
   --font-mono: var(--pfm-font-mono);
 
+  /* shadcn/ui semantic palette — aliased onto the SAME --pfm-* skin vars, so
+     shadcn primitives and our role utilities are one theming system. (shadcn's
+     "accent" hover token is intentionally omitted to avoid clashing with our
+     brass `accent`; primitives use `hover`/`fg` for hover surfaces instead.) */
+  --color-background: var(--pfm-base);
+  --color-foreground: var(--pfm-fg);
+  --color-card-foreground: var(--pfm-fg);
+  --color-popover: var(--pfm-elevated);
+  --color-popover-foreground: var(--pfm-fg);
+  --color-primary: var(--pfm-accent);
+  --color-primary-foreground: var(--pfm-base);
+  --color-secondary: var(--pfm-elevated);
+  --color-secondary-foreground: var(--pfm-fg);
+  --color-muted: var(--pfm-surface);
+  --color-muted-foreground: var(--pfm-fg-muted);
+  --color-destructive: var(--pfm-danger);
+  --color-destructive-foreground: var(--pfm-fg);
+  --color-input: var(--pfm-border);
+  --color-ring: var(--pfm-accent);
+
   --radius: var(--pfm-radius);
+  --radius-sm: var(--pfm-radius);
+  --radius-md: calc(var(--pfm-radius) + 2px);
+  --radius-lg: calc(var(--pfm-radius) + 4px);
 }
 
 body {

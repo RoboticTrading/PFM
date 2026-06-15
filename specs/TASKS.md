@@ -15,7 +15,7 @@ Check off (`[x]`) only when the **gate is green** (typecheck+lint+test+build). E
 - [x] **1.1 Tailwind v4 + token layer.** Tailwind v4 + the semantic design-token scaffold
   (`lib/theme/`) + a `ThemeProvider`; ship **"Walnut & Brass"** as the default skin. *Done =* gate
   green; a token-only component renders; swapping the skin var re-themes (a test asserts it).
-- [ ] **1.2 shadcn/ui primitives.** Init shadcn (Radix); wire its CSS-variable theming to our skin
+- [x] **1.2 shadcn/ui primitives.** Init shadcn (Radix); wire its CSS-variable theming to our skin
   tokens — **one theming system**. Add core primitives (button, input, dialog/sheet, **table**,
   tabs, dropdown, command/search). *Done =* gate green; a primitive renders under Walnut & Brass.
 - [ ] **1.3 Drizzle on MyDB (`pfm` role).** Drizzle + `drizzle.config.ts` + `lib/db/` connecting to
