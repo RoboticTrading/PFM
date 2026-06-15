@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Default skin seed ("Walnut & Brass").
+   These `--pfm-*` values are the single source of truth at runtime; the
+   ThemeProvider overwrites them on `:root` when the skin changes. Keep this in
+   sync with `src/lib/theme/skins.ts` (walnutBrass) — it prevents a flash of
+   unstyled color before hydration.
+--------------------------------------------------------------------------- */
+:root {
+  --pfm-base: #0a0d14;
+  --pfm-panel: #0e1118;
+  --pfm-surface: #12161f;
+  --pfm-elevated: #171c28;
+  --pfm-hover: #1c2233;
+  --pfm-card: #12161f;
+  --pfm-border: #1a1f2c;
+  --pfm-border-light: #242a3a;
+  --pfm-accent: #b4964f;
+  --pfm-accent-dim: #8a7340;
+  --pfm-accent-bright: #d4b668;
+  --pfm-fg: #d8d3c7;
+  --pfm-fg-muted: #9a9faa;
+  --pfm-fg-subtle: #6a7080;
+  --pfm-success: #5a9e6f;
+  --pfm-danger: #b05555;
+  --pfm-warning: #c49a3c;
+  --pfm-info: #5a7faa;
+  --pfm-font-display: "Cormorant Garamond", Georgia, serif;
+  --pfm-font-body: "DM Sans", system-ui, sans-serif;
+  --pfm-font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --pfm-radius: 2px;
+  color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------------------
+   Token → Tailwind bridge. `@theme inline` exposes the runtime `--pfm-*`
+   variables as Tailwind utilities (`bg-surface`, `text-accent`, `border-border`,
+   `font-mono`, `rounded`, …) so call sites use roles, never raw colors. shadcn
+   wires into the same variables in task 1.2 — one theming system.
+--------------------------------------------------------------------------- */
+@theme inline {
+  --color-base: var(--pfm-base);
+  --color-panel: var(--pfm-panel);
+  --color-surface: var(--pfm-surface);
+  --color-elevated: var(--pfm-elevated);
+  --color-hover: var(--pfm-hover);
+  --color-card: var(--pfm-card);
+  --color-border: var(--pfm-border);
+  --color-border-light: var(--pfm-border-light);
+  --color-accent: var(--pfm-accent);
+  --color-accent-dim: var(--pfm-accent-dim);
+  --color-accent-bright: var(--pfm-accent-bright);
+  --color-fg: var(--pfm-fg);
+  --color-fg-muted: var(--pfm-fg-muted);
+  --color-fg-subtle: var(--pfm-fg-subtle);
+  --color-success: var(--pfm-success);
+  --color-danger: var(--pfm-danger);
+  --color-warning: var(--pfm-warning);
+  --color-info: var(--pfm-info);
+
+  --font-display: var(--pfm-font-display);
+  --font-sans: var(--pfm-font-body);
+  --font-mono: var(--pfm-font-mono);
+
+  --radius: var(--pfm-radius);
+}
+
+body {
+  background-color: var(--pfm-base);
+  color: var(--pfm-fg);
+  font-family: var(--pfm-font-body);
+}
