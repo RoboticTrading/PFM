@@ -18,6 +18,11 @@ version: "3.8"
 services:
   pfm:
     image: registry.prop-desk.io/pfm:latest
+    # MyDB's `data02` doesn't resolve via swarm-service DNS (only standalone
+    # containers see it); every MyDB-consuming service on the cluster maps it
+    # explicitly. Without this the app gets ENOTFOUND data02 on every query.
+    extra_hosts:
+      - "data02:192.168.42.111"
     environment:
       NODE_ENV: production
       PORT: "3000"
