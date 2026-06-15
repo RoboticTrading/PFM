@@ -10,20 +10,24 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SPLIT_CATEGORY, type RegisterTxn } from "@/lib/accounts/register-types";
 import type { CanonicalTxn } from "@/lib/db/read-models";
 import { formatUsd, toScaled } from "@/lib/money";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 
+import { TxnFilterBar } from "./TxnFilterBar";
+import { EMPTY_FACETS, filterTransactions, type TxnFacets } from "./filter";
+
 export type SortKey = "date" | "description" | "amount";
 export type SortDir = "asc" | "desc";
 
 /** Pure, stable sort of canonical transactions — unit-testable without render. */
-export function sortTransactions(
-  rows: readonly CanonicalTxn[],
+export function sortTransactions<T extends CanonicalTxn>(
+  rows: readonly T[],
   key: SortKey,
   dir: SortDir,
-): CanonicalTxn[] {
+): T[] {
   const factor = dir === "asc" ? 1 : -1;
   return [...rows].sort((a, b) => {
     let cmp: number;
@@ -72,8 +76,8 @@ function SortHeader({
 
 /**
  * Quicken-style transaction register over an account's source read-model. Dense,
- * sortable, mono amounts (negative in red). Read-only; rows reference the source
- * txn (lineage) and are never copied.
+ * sortable, facetable (search / direction / date / category). Read-only; rows
+ * reference the source txn (lineage) and are never copied.
  */
 export function TransactionRegister({
   accountId,
@@ -90,17 +94,18 @@ export function TransactionRegister({
     key: "date",
     dir: "desc",
   });
+  const [facets, setFacets] = useState<TxnFacets>(EMPTY_FACETS);
 
-  const rows = useMemo(
-    () => (data ? sortTransactions(data, sort.key, sort.dir) : []),
-    [data, sort],
-  );
+  const rows = useMemo(() => {
+    if (!data) return [] as RegisterTxn[];
+    return sortTransactions(filterTransactions(data, facets), sort.key, sort.dir);
+  }, [data, facets, sort]);
 
   function onSort(key: SortKey) {
     setSort((s) =>
       s.key === key
         ? { key, dir: s.dir === "asc" ? "desc" : "asc" }
-        : { key, dir: key === "amount" || key === "date" ? "desc" : "asc" },
+        : { key, dir: key === "description" ? "asc" : "desc" },
     );
   }
 
@@ -110,50 +115,75 @@ export function TransactionRegister({
   if (isError) {
     return <p className="p-4 text-sm text-danger">Failed to load transactions.</p>;
   }
-  if (rows.length === 0) {
-    return <p className="p-4 text-sm text-fg-muted">No transactions.</p>;
-  }
+
+  const total = data?.length ?? 0;
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <SortHeader label="Date" col="date" sort={sort} onSort={onSort} className="w-32" />
-          <SortHeader label="Description" col="description" sort={sort} onSort={onSort} />
-          <TableHead className="w-20">Symbol</TableHead>
-          <SortHeader
-            label="Amount"
-            col="amount"
-            sort={sort}
-            onSort={onSort}
-            className="w-36 text-right"
-          />
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((t) => {
-          const negative = t.amount.startsWith("-");
-          return (
-            <TableRow key={`${t.sourceSchema}:${t.sourceTxnId}`}>
-              <TableCell className="font-mono text-xs text-fg-muted">
-                {t.date.slice(0, 10)}
-              </TableCell>
-              <TableCell className="text-fg">{t.description}</TableCell>
-              <TableCell className="font-mono text-xs text-fg-subtle">
-                {t.symbol ?? ""}
-              </TableCell>
-              <TableCell
-                className={cn(
-                  "text-right font-mono text-sm tabular-nums",
-                  negative ? "text-danger" : "text-fg",
-                )}
-              >
-                {formatUsd(t.amount)}
-              </TableCell>
+    <div>
+      <TxnFilterBar
+        facets={facets}
+        onChange={setFacets}
+        showing={rows.length}
+        total={total}
+      />
+      {rows.length === 0 ? (
+        <p className="p-4 text-sm text-fg-muted">No matching transactions.</p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <SortHeader label="Date" col="date" sort={sort} onSort={onSort} className="w-32" />
+              <SortHeader label="Description" col="description" sort={sort} onSort={onSort} />
+              <TableHead className="w-40">Category</TableHead>
+              <TableHead className="w-20">Symbol</TableHead>
+              <SortHeader
+                label="Amount"
+                col="amount"
+                sort={sort}
+                onSort={onSort}
+                className="w-36 text-right"
+              />
             </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
+          </TableHeader>
+          <TableBody>
+            {rows.map((t) => {
+              const negative = t.amount.startsWith("-");
+              const isSplit = t.categoryId === SPLIT_CATEGORY;
+              return (
+                <TableRow key={`${t.sourceSchema}:${t.sourceTxnId}`}>
+                  <TableCell className="font-mono text-xs text-fg-muted">
+                    {t.date.slice(0, 10)}
+                  </TableCell>
+                  <TableCell className="text-fg">{t.description}</TableCell>
+                  <TableCell
+                    className={cn(
+                      "text-sm",
+                      t.categoryName
+                        ? isSplit
+                          ? "text-info"
+                          : "text-fg-muted"
+                        : "text-fg-subtle italic",
+                    )}
+                  >
+                    {t.categoryName ?? "uncategorized"}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-fg-subtle">
+                    {t.symbol ?? ""}
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      "text-right font-mono text-sm tabular-nums",
+                      negative ? "text-danger" : "text-fg",
+                    )}
+                  >
+                    {formatUsd(t.amount)}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      )}
+    </div>
   );
 }

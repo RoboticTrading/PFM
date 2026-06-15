@@ -52,7 +52,7 @@ Check off (`[x]`) only when the **gate is green** (typecheck+lint+test+build). E
   Quicken-style). *Done =* gate green; renders a register from fixtures; component tests.
 - [x] **4.2 `categorize` / `splitTransaction`** Actions + category hierarchy (reference `source_txn_id`,
   no copy). *Done =* gate green; categorize + split tested; lineage preserved.
-- [ ] **4.3 Filters / facets** on the register (account, date, category, payee, amount). *Done =* gate green.
+- [x] **4.3 Filters / facets** on the register (account, date, category, payee, amount). *Done =* gate green.
 
 ## Phase 5 — The Explorer
 - [ ] **5.1 Artifact-centric app shell** — object nav, dense tables, drill-ins, detail panes,

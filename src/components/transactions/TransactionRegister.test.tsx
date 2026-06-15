@@ -1,9 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { CanonicalTxn } from "@/lib/db/read-models";
+import type { RegisterTxn } from "@/lib/accounts/register";
 
-const ROWS: CanonicalTxn[] = [
+const ROWS: RegisterTxn[] = [
   {
     sourceSchema: "schwab_checking",
     sourceView: "v_transactions",
@@ -11,6 +11,8 @@ const ROWS: CanonicalTxn[] = [
     date: "2026-05-10",
     description: "Paycheck",
     amount: "2500.0000",
+    categoryId: null,
+    categoryName: null,
   },
   {
     sourceSchema: "schwab_checking",
@@ -19,6 +21,8 @@ const ROWS: CanonicalTxn[] = [
     date: "2026-05-01",
     description: "Whole Foods",
     amount: "-82.1000",
+    categoryId: null,
+    categoryName: null,
   },
   {
     sourceSchema: "schwab_checking",
@@ -27,6 +31,8 @@ const ROWS: CanonicalTxn[] = [
     date: "2026-05-20",
     description: "Amazon",
     amount: "-19.9900",
+    categoryId: null,
+    categoryName: null,
   },
 ];
 
@@ -36,6 +42,9 @@ vi.mock("@/lib/trpc/client", () => ({
       forAccount: {
         useQuery: () => ({ isLoading: false, isError: false, data: ROWS }),
       },
+    },
+    categories: {
+      list: { useQuery: () => ({ isLoading: false, isError: false, data: [] }) },
     },
   },
 }));
@@ -95,5 +104,19 @@ describe("TransactionRegister", () => {
     const amountHeader = screen.getByRole("button", { name: /amount/i });
     fireEvent.click(amountHeader);
     expect(amountHeader.textContent).toMatch(/[▲▼]/);
+  });
+
+  it("applies the search facet", () => {
+    render(
+      <ThemeProvider>
+        <TransactionRegister accountId="00000000-0000-0000-0000-000000000000" />
+      </ThemeProvider>,
+    );
+    fireEvent.change(screen.getByLabelText("Search description"), {
+      target: { value: "amazon" },
+    });
+    expect(screen.queryByText("Paycheck")).not.toBeInTheDocument();
+    expect(screen.getByText("Amazon")).toBeInTheDocument();
+    expect(screen.getByText(/1 of 3/)).toBeInTheDocument();
   });
 });

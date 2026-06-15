@@ -1,11 +1,14 @@
 import { z } from "zod";
 
-import { accountTransactions } from "@/lib/accounts/transactions";
+import { accountRegister } from "@/lib/accounts/register";
 
 import { publicProcedure, router } from "../trpc";
 
 export const transactionsRouter = router({
-  /** Canonical transactions for an account (read-only over the source view). */
+  /**
+   * Register rows for an account: canonical source transactions (RO) enriched
+   * with their categorization. Read-only; lineage by source_txn_id.
+   */
   forAccount: publicProcedure
     .input(
       z.object({
@@ -14,6 +17,6 @@ export const transactionsRouter = router({
       }),
     )
     .query(({ input }) =>
-      accountTransactions(input.accountId, { limit: input.limit }),
+      accountRegister(input.accountId, { limit: input.limit }),
     ),
 });
