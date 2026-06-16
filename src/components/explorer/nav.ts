@@ -13,6 +13,7 @@ export interface NavItem {
 export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/dashboard", label: "Dashboard", glyph: "◫" },
   { href: "/accounts", label: "Accounts", glyph: "▤" },
+  { href: "/transactions", label: "Transactions", glyph: "⇄" },
   { href: "/categories", label: "Categories", glyph: "❡" },
   { href: "/budgets", label: "Budgets", glyph: "▦" },
   { href: "/reports", label: "Reports", glyph: "▧" },

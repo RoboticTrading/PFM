@@ -18,6 +18,7 @@ describe("activeNav", () => {
     expect(NAV_ITEMS.map((i) => i.href)).toEqual([
       "/dashboard",
       "/accounts",
+      "/transactions",
       "/categories",
       "/budgets",
       "/reports",
