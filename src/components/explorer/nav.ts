@@ -14,6 +14,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/dashboard", label: "Dashboard", glyph: "◫" },
   { href: "/accounts", label: "Accounts", glyph: "▤" },
   { href: "/categories", label: "Categories", glyph: "❡" },
+  { href: "/budgets", label: "Budgets", glyph: "▦" },
+  { href: "/reports", label: "Reports", glyph: "▧" },
   { href: "/positions", label: "Positions", glyph: "◆" },
 ] as const;
 

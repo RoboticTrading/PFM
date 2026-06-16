@@ -19,6 +19,8 @@ describe("activeNav", () => {
       "/dashboard",
       "/accounts",
       "/categories",
+      "/budgets",
+      "/reports",
       "/positions",
     ]);
   });
