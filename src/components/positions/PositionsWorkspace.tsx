@@ -64,7 +64,21 @@ export function PositionsWorkspace() {
 /** PFM's own paired positions. */
 function MyPositions() {
   const list = trpc.positions.list.useQuery();
+  const unmatched = trpc.positions.unmatched.useQuery();
+  const history = trpc.positions.history.useQuery({ openOnly: false, limit: 200 });
   const rows = useMemo(() => list.data ?? [], [list.data]);
+  const unlinked = useMemo(
+    () => new Set((unmatched.data ?? []).map((u) => u.id)),
+    [unmatched.data],
+  );
+
+  const utils = trpc.useUtils();
+  const link = trpc.positions.linkPosition.useMutation({
+    onSuccess: () => {
+      void utils.positions.unmatched.invalidate();
+      void utils.positions.list.invalidate();
+    },
+  });
 
   if (list.isLoading) return <p className="p-4 text-sm text-fg-muted">Loading…</p>;
   if (rows.length === 0) {
@@ -75,6 +89,7 @@ function MyPositions() {
       </p>
     );
   }
+  const histRows = history.data ?? [];
   return (
     <div className="overflow-hidden rounded-md border border-border bg-surface">
       <table className="w-full text-sm">
@@ -85,6 +100,7 @@ function MyPositions() {
             <th className="px-3 py-2 text-left font-medium">Structure</th>
             <th className="px-3 py-2 text-left font-medium">Status</th>
             <th className="px-3 py-2 text-left font-medium">Opened</th>
+            <th className="px-3 py-2 text-left font-medium">Broker link</th>
           </tr>
         </thead>
         <tbody>
@@ -105,6 +121,36 @@ function MyPositions() {
               </td>
               <td className="px-3 py-1.5 font-mono text-xs text-fg-muted">
                 {p.openedAt ?? "—"}
+              </td>
+              <td className="px-3 py-1.5">
+                {unlinked.has(p.id) ? (
+                  <select
+                    aria-label="Link to broker history"
+                    defaultValue=""
+                    disabled={link.isPending}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        link.mutate({
+                          positionId: p.id,
+                          positionHistoryId: e.target.value,
+                        });
+                      }
+                    }}
+                    className="max-w-[16rem] rounded-md border border-border bg-card px-2 py-1 text-sm text-fg outline-none focus-visible:border-accent"
+                  >
+                    <option value="">Link to history…</option>
+                    {histRows.map((h) => (
+                      <option key={h.positionId} value={h.positionId}>
+                        {(h.underlying ?? "?") +
+                          " · " +
+                          (h.strategyType ?? "") +
+                          (h.openDate ? " · " + h.openDate : "")}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="text-xs text-success">linked ✓</span>
+                )}
               </td>
             </tr>
           ))}

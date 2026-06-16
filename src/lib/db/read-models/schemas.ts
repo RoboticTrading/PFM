@@ -5,6 +5,7 @@ import {
   numeric,
   pgSchema,
   text,
+  uuid,
   varchar,
 } from "drizzle-orm/pg-core";
 
@@ -100,7 +101,7 @@ export const vNontradeTransactions = schwabBrokerage
 
 // --- trade_analysis.position_history (a base table; for position linking) -
 export const positionHistory = tradeAnalysis.table("position_history", {
-  positionId: text("position_id"),
+  positionId: uuid("position_id"),
   strategyType: text("strategy_type"),
   underlying: text("underlying"),
   expiration: date("expiration"),
