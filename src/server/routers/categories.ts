@@ -257,4 +257,39 @@ export const categoriesRouter = router({
       return { id: input.id };
     },
   }),
+
+  /** Assign one category to many transactions at once (replaces each prior
+   *  categorization). One audit row records the category + count. */
+  categorizeBulk: defineAction({
+    name: "categorizeBulk",
+    input: z.object({
+      categoryId: z.string().uuid(),
+      txns: z
+        .array(z.object({ ...txnRef, txnDate: isoDate, amount: moneyString }))
+        .min(1)
+        .max(1000),
+    }),
+    target: (input) => input.categoryId,
+    redact: (input) => ({ categoryId: input.categoryId, count: input.txns.length }),
+    handler: async ({ input, tx }) => {
+      for (const t of input.txns) {
+        await tx
+          .delete(schema.transactionCategory)
+          .where(
+            and(
+              eq(schema.transactionCategory.sourceSchema, t.sourceSchema),
+              eq(schema.transactionCategory.sourceTxnId, t.sourceTxnId),
+            ),
+          );
+        await tx.insert(schema.transactionCategory).values({
+          sourceSchema: t.sourceSchema,
+          sourceTxnId: t.sourceTxnId,
+          txnDate: t.txnDate,
+          categoryId: input.categoryId,
+          amount: t.amount,
+        });
+      }
+      return { count: input.txns.length };
+    },
+  }),
 });

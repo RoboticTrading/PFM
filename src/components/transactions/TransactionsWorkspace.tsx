@@ -47,6 +47,38 @@ export function TransactionsWorkspace() {
     [rows],
   );
 
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkCategory, setBulkCategory] = useState("");
+  const bulk = trpc.categories.categorizeBulk.useMutation({
+    onSuccess: () => {
+      void utils.transactions.forAccount.invalidate();
+      setSelected(new Set());
+      setBulkCategory("");
+    },
+  });
+
+  function toggleRow(key: string) {
+    setSelected((s) => {
+      const next = new Set(s);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function applyBulk() {
+    if (!bulkCategory) return;
+    const txns = rows
+      .filter((t) => selected.has(`${t.sourceSchema}:${t.sourceTxnId}`))
+      .map((t) => ({
+        sourceSchema: t.sourceSchema,
+        sourceTxnId: t.sourceTxnId,
+        txnDate: t.date.slice(0, 10),
+        amount: t.amount,
+      }));
+    bulk.mutate({ categoryId: bulkCategory, txns });
+  }
+
   return (
     <main className="px-8 py-6">
       <header className="mb-5 flex flex-wrap items-end justify-between gap-3">
@@ -77,6 +109,39 @@ export function TransactionsWorkspace() {
         </label>
       </header>
 
+      {selected.size > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-md border border-border bg-card p-3">
+          <span className="text-sm font-medium text-fg">{selected.size} selected</span>
+          <select
+            value={bulkCategory}
+            onChange={(e) => setBulkCategory(e.target.value)}
+            className="rounded-md border border-border bg-base px-2 py-1.5 text-sm text-fg outline-none focus-visible:border-accent"
+          >
+            <option value="">Assign category…</option>
+            {(categories.data ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.kind} · {c.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={applyBulk}
+            disabled={!bulkCategory || bulk.isPending}
+            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground outline-none transition-colors hover:bg-accent-bright disabled:opacity-40"
+          >
+            {bulk.isPending ? "Applying…" : "Apply to all"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelected(new Set())}
+            className="text-sm text-fg-muted outline-none hover:text-fg"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       <div className="rounded-md border border-border bg-base">
         {register.isLoading ? (
           <p className="p-4 text-sm text-fg-muted">Loading transactions…</p>
@@ -88,6 +153,20 @@ export function TransactionsWorkspace() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-[10px] uppercase tracking-wide text-fg-subtle">
+                <th className="w-8 px-3 py-2">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all"
+                    checked={rows.length > 0 && selected.size === rows.length}
+                    onChange={(e) =>
+                      setSelected(
+                        e.target.checked
+                          ? new Set(rows.map((r) => `${r.sourceSchema}:${r.sourceTxnId}`))
+                          : new Set(),
+                      )
+                    }
+                  />
+                </th>
                 <th className="px-3 py-2 text-left font-medium">Date</th>
                 <th className="px-3 py-2 text-left font-medium">Description</th>
                 <th className="px-3 py-2 text-left font-medium">Category</th>
@@ -101,6 +180,14 @@ export function TransactionsWorkspace() {
                 const saving = savingId === key && categorize.isPending;
                 return (
                   <tr key={key} className="border-b border-border last:border-0">
+                    <td className="px-3 py-1.5">
+                      <input
+                        type="checkbox"
+                        aria-label="Select transaction"
+                        checked={selected.has(key)}
+                        onChange={() => toggleRow(key)}
+                      />
+                    </td>
                     <td className="px-3 py-1.5 font-mono text-xs text-fg-muted">
                       {t.date.slice(0, 10)}
                     </td>
