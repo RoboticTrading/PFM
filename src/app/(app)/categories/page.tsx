@@ -1,4 +1,4 @@
-import { CategoryTree } from "@/components/categories/CategoryTree";
+import { CategoryManager } from "@/components/categories/CategoryManager";
 
 export const metadata = { title: "Categories — PFM" };
 
@@ -10,12 +10,10 @@ export default function CategoriesPage() {
           Categories
         </h1>
         <p className="text-sm text-fg-muted">
-          The Income / Expense / Transfer hierarchy.
+          The Income / Expense / Transfer hierarchy — add, rename, remove.
         </p>
       </header>
-      <div className="rounded-md border border-border bg-base">
-        <CategoryTree />
-      </div>
+      <CategoryManager />
     </main>
   );
 }

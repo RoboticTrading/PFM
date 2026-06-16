@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -170,6 +171,90 @@ export const categoriesRouter = router({
           })),
         )
         .returning();
+    },
+  }),
+
+  /** Create a category, optionally under a parent (top-level kinds are roots). */
+  create: defineAction({
+    name: "createCategory",
+    input: z.object({
+      name: z.string().min(1).max(120),
+      kind: z.enum(schema.CATEGORY_KINDS),
+      parentId: z.string().uuid().nullish(),
+    }),
+    target: (_input, output) => output.id,
+    handler: async ({ input, tx }) => {
+      const [row] = await tx
+        .insert(schema.category)
+        .values({
+          name: input.name,
+          kind: input.kind,
+          parentId: input.parentId ?? null,
+        })
+        .returning();
+      return row;
+    },
+  }),
+
+  /** Rename a category. */
+  rename: defineAction({
+    name: "renameCategory",
+    input: z.object({ id: z.string().uuid(), name: z.string().min(1).max(120) }),
+    target: (input) => input.id,
+    handler: async ({ input, tx }) => {
+      const [row] = await tx
+        .update(schema.category)
+        .set({ name: input.name, updatedAt: new Date() })
+        .where(eq(schema.category.id, input.id))
+        .returning();
+      if (!row) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Category not found." });
+      }
+      return row;
+    },
+  }),
+
+  /** Delete a category — refused if it has children, budgets, or categorizations. */
+  remove: defineAction({
+    name: "deleteCategory",
+    input: z.object({ id: z.string().uuid() }),
+    target: (input) => input.id,
+    handler: async ({ input, tx }) => {
+      const child = await tx
+        .select({ id: schema.category.id })
+        .from(schema.category)
+        .where(eq(schema.category.parentId, input.id))
+        .limit(1);
+      if (child.length > 0) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Remove child categories first.",
+        });
+      }
+      const used = await tx
+        .select({ id: schema.transactionCategory.id })
+        .from(schema.transactionCategory)
+        .where(eq(schema.transactionCategory.categoryId, input.id))
+        .limit(1);
+      if (used.length > 0) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Category is used by transactions.",
+        });
+      }
+      const budgeted = await tx
+        .select({ id: schema.budget.id })
+        .from(schema.budget)
+        .where(eq(schema.budget.categoryId, input.id))
+        .limit(1);
+      if (budgeted.length > 0) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Category has budgets — remove them first.",
+        });
+      }
+      await tx.delete(schema.category).where(eq(schema.category.id, input.id));
+      return { id: input.id };
     },
   }),
 });
