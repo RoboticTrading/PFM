@@ -5,9 +5,11 @@ import { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 
-/** Infer a leg side from a Schwab trade `type` string. */
-function inferSide(type: string | null): "buy" | "sell" {
-  return type && /sell/i.test(type) ? "sell" : "buy";
+/** Infer a leg side from a Schwab fill: a negative signed quantity is a sell
+ *  (sold/short), a positive quantity is a buy. (`type` is just "TRADE"; the
+ *  direction lives in the quantity sign.) */
+function inferSide(quantity: string | null): "buy" | "sell" {
+  return quantity != null && quantity.trim().startsWith("-") ? "sell" : "buy";
 }
 function abs(n: string): string {
   return n.startsWith("-") ? n.slice(1) : n;
@@ -48,7 +50,7 @@ export function PairFills() {
     .map((f) => ({
       sourceSchema: "schwab_brokerage",
       sourceFillId: String(f.activityId),
-      side: inferSide(f.type),
+      side: inferSide(f.quantity),
       quantity: abs(f.quantity as string),
       price: f.price as string,
     }));
@@ -150,7 +152,7 @@ export function PairFills() {
               {rows.map((f) => {
                 const id = String(f.activityId);
                 const checked = selected.has(id);
-                const side = inferSide(f.type);
+                const side = inferSide(f.quantity);
                 return (
                   <tr
                     key={id}
