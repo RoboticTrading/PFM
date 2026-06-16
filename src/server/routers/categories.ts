@@ -32,7 +32,11 @@ export const categoriesRouter = router({
         kind: schema.category.kind,
       })
       .from(schema.category)
-      .orderBy(asc(schema.category.kind), asc(schema.category.name));
+      .orderBy(
+        asc(schema.category.kind),
+        asc(schema.category.sortOrder),
+        asc(schema.category.name),
+      );
   }),
 
   /** Existing categorization(s) for a source transaction (with names). */
@@ -255,6 +259,23 @@ export const categoriesRouter = router({
       }
       await tx.delete(schema.category).where(eq(schema.category.id, input.id));
       return { id: input.id };
+    },
+  }),
+
+  /** Set the manual display order of a sibling group (sortOrder = index). */
+  reorder: defineAction({
+    name: "reorderCategories",
+    input: z.object({ ids: z.array(z.string().uuid()).min(1) }),
+    target: (input) => input.ids[0],
+    redact: (input) => ({ count: input.ids.length }),
+    handler: async ({ input, tx }) => {
+      for (let i = 0; i < input.ids.length; i++) {
+        await tx
+          .update(schema.category)
+          .set({ sortOrder: i })
+          .where(eq(schema.category.id, input.ids[i]));
+      }
+      return { count: input.ids.length };
     },
   }),
 

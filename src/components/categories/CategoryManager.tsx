@@ -24,6 +24,16 @@ export function CategoryManager() {
   const create = trpc.categories.create.useMutation({ onSuccess: refresh });
   const rename = trpc.categories.rename.useMutation({ onSuccess: refresh });
   const remove = trpc.categories.remove.useMutation({ onSuccess: refresh });
+  const reorder = trpc.categories.reorder.useMutation({ onSuccess: refresh });
+
+  function move(group: { id: string }[], id: string, dir: -1 | 1) {
+    const idx = group.findIndex((g) => g.id === id);
+    const j = idx + dir;
+    if (idx < 0 || j < 0 || j >= group.length) return;
+    const ids = group.map((g) => g.id);
+    [ids[idx], ids[j]] = [ids[j], ids[idx]];
+    reorder.mutate({ ids });
+  }
 
   const [name, setName] = useState("");
   const [kind, setKind] = useState<Kind>("Expense");
@@ -148,6 +158,8 @@ export function CategoryManager() {
                     onCommit={commitEdit}
                     onCancel={() => setEditingId(null)}
                     onDelete={() => remove.mutate({ id: root.id })}
+                    onMoveUp={() => move(kindRootsFor(k), root.id, -1)}
+                    onMoveDown={() => move(kindRootsFor(k), root.id, 1)}
                   />
                   <ul className="ml-3 mt-0.5 space-y-0.5 border-l border-border pl-3">
                     {childrenOf(root.id).map((child) => (
@@ -162,6 +174,8 @@ export function CategoryManager() {
                           onCommit={commitEdit}
                           onCancel={() => setEditingId(null)}
                           onDelete={() => remove.mutate({ id: child.id })}
+                          onMoveUp={() => move(childrenOf(root.id), child.id, -1)}
+                          onMoveDown={() => move(childrenOf(root.id), child.id, 1)}
                         />
                       </li>
                     ))}
@@ -186,6 +200,8 @@ function Row({
   onCommit,
   onCancel,
   onDelete,
+  onMoveUp,
+  onMoveDown,
 }: {
   id: string;
   name: string;
@@ -197,6 +213,8 @@ function Row({
   onCommit: () => void;
   onCancel: () => void;
   onDelete: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
 }) {
   if (editing) {
     return (
@@ -234,6 +252,22 @@ function Row({
         {name}
       </span>
       <span className="flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+        <button
+          type="button"
+          onClick={onMoveUp}
+          aria-label="Move up"
+          className="text-xs text-fg-subtle hover:text-accent"
+        >
+          ↑
+        </button>
+        <button
+          type="button"
+          onClick={onMoveDown}
+          aria-label="Move down"
+          className="text-xs text-fg-subtle hover:text-accent"
+        >
+          ↓
+        </button>
         <button
           type="button"
           onClick={onStartEdit}

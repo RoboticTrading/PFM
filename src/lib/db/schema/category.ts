@@ -1,4 +1,10 @@
-import { type AnyPgColumn, text, unique, uuid } from "drizzle-orm/pg-core";
+import {
+  type AnyPgColumn,
+  integer,
+  text,
+  unique,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 import { financialmanager } from "./_schema";
 import { timestamps } from "./columns";
@@ -18,6 +24,8 @@ export const category = financialmanager.table(
     parentId: uuid("parent_id").references((): AnyPgColumn => category.id),
     name: text("name").notNull(),
     kind: text("kind", { enum: CATEGORY_KINDS }).notNull(),
+    /** Manual display order among siblings (lower first; NULLs sort last). */
+    sortOrder: integer("sort_order"),
     ...timestamps,
   },
   (t) => [unique("category_name_unique").on(t.name)],

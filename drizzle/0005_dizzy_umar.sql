@@ -1,0 +1,1 @@
+ALTER TABLE "financialmanager"."category" ADD COLUMN "sort_order" integer;
