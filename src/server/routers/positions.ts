@@ -1,10 +1,10 @@
 import { TRPCError } from "@trpc/server";
-import { asc, eq, isNull } from "drizzle-orm";
+import { asc, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { listPositionHistory } from "@/lib/db/read-models";
-import { positionHistory } from "@/lib/db/read-models/schemas";
+import { positionHistory, vTradeTransactions } from "@/lib/db/read-models/schemas";
 
 import { defineAction } from "../actions/defineAction";
 import { publicProcedure, router } from "../trpc";
@@ -87,6 +87,30 @@ export const positionsRouter = router({
         .where(eq(schema.positionLeg.positionId, input.id));
       return { position, legs };
     }),
+
+  /** Recent schwab trade fills available to pair into a position (read-only). */
+  availableFills: publicProcedure
+    .input(
+      z
+        .object({ limit: z.number().int().min(1).max(500).default(150) })
+        .default({ limit: 150 }),
+    )
+    .query(({ input }) =>
+      getDb()
+        .select({
+          activityId: vTradeTransactions.activityId,
+          tradeDate: vTradeTransactions.tradeDate,
+          symbol: vTradeTransactions.symbol,
+          type: vTradeTransactions.type,
+          positionEffect: vTradeTransactions.positionEffect,
+          quantity: vTradeTransactions.amount,
+          price: vTradeTransactions.price,
+          description: vTradeTransactions.description,
+        })
+        .from(vTradeTransactions)
+        .orderBy(desc(vTradeTransactions.tradeDate))
+        .limit(input.limit),
+    ),
 
   /**
    * Pair source fills into a new manual Position with PositionLegs. Each leg
