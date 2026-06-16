@@ -7,6 +7,7 @@ import { formatUsd } from "@/lib/money";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 
+import { BalanceForwardForm } from "./BalanceForwardForm";
 import { KindBadge } from "./KindBadge";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -61,6 +62,13 @@ export function AccountDetail({ id }: { id: string }) {
             {" + since "}
             {formatUsd(balance.data.since)}
           </p>
+        )}
+        {balance.data && (
+          <BalanceForwardForm
+            accountId={id}
+            currentAsOf={balance.data.asOfDate}
+            currentAmount={balance.data.forward}
+          />
         )}
       </section>
 

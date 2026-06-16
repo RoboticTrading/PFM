@@ -2,9 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { SPLIT_CATEGORY } from "@/lib/accounts/register-types";
 import { formatUsd } from "@/lib/money";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
+
+import { SplitDialog, type SplitTarget } from "./SplitDialog";
 
 /**
  * Transactions workspace — pick an account, then categorize its register inline.
@@ -30,6 +33,7 @@ export function TransactionsWorkspace() {
 
   const utils = trpc.useUtils();
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [splitTarget, setSplitTarget] = useState<SplitTarget | null>(null);
   const categorize = trpc.categories.categorize.useMutation({
     onSettled: () => {
       void utils.transactions.forAccount.invalidate();
@@ -102,34 +106,55 @@ export function TransactionsWorkspace() {
                     </td>
                     <td className="px-3 py-1.5 text-fg">{t.description}</td>
                     <td className="px-3 py-1.5">
-                      <select
-                        aria-label="Category"
-                        value={t.categoryId ?? ""}
-                        disabled={saving}
-                        onChange={(e) => {
-                          const categoryId = e.target.value;
-                          if (!categoryId) return;
-                          setSavingId(key);
-                          categorize.mutate({
-                            sourceSchema: t.sourceSchema,
-                            sourceTxnId: t.sourceTxnId,
-                            txnDate: t.date.slice(0, 10),
-                            categoryId,
-                            amount: t.amount,
-                          });
-                        }}
-                        className={cn(
-                          "max-w-[14rem] rounded-md border border-border bg-card px-2 py-1 text-sm outline-none focus-visible:border-accent",
-                          t.categoryId ? "text-fg" : "text-fg-subtle italic",
+                      <div className="flex items-center gap-2">
+                        {t.categoryId === SPLIT_CATEGORY ? (
+                          <span className="text-sm text-info">split</span>
+                        ) : (
+                          <select
+                            aria-label="Category"
+                            value={t.categoryId ?? ""}
+                            disabled={saving}
+                            onChange={(e) => {
+                              const categoryId = e.target.value;
+                              if (!categoryId) return;
+                              setSavingId(key);
+                              categorize.mutate({
+                                sourceSchema: t.sourceSchema,
+                                sourceTxnId: t.sourceTxnId,
+                                txnDate: t.date.slice(0, 10),
+                                categoryId,
+                                amount: t.amount,
+                              });
+                            }}
+                            className={cn(
+                              "max-w-[14rem] rounded-md border border-border bg-card px-2 py-1 text-sm outline-none focus-visible:border-accent",
+                              t.categoryId ? "text-fg" : "text-fg-subtle italic",
+                            )}
+                          >
+                            <option value="">uncategorized</option>
+                            {(categories.data ?? []).map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.kind} · {c.name}
+                              </option>
+                            ))}
+                          </select>
                         )}
-                      >
-                        <option value="">uncategorized</option>
-                        {(categories.data ?? []).map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.kind} · {c.name}
-                          </option>
-                        ))}
-                      </select>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSplitTarget({
+                              sourceSchema: t.sourceSchema,
+                              sourceTxnId: t.sourceTxnId,
+                              txnDate: t.date.slice(0, 10),
+                              total: t.amount,
+                              description: t.description,
+                            })
+                          }
+                          className="text-xs text-fg-subtle outline-none hover:text-accent focus-visible:text-accent"
+                        >
+                          split
+                        </button>
+                      </div>
                     </td>
                     <td
                       className={cn(
@@ -150,6 +175,13 @@ export function TransactionsWorkspace() {
         <p className="mt-3 text-sm text-danger">
           Couldn&rsquo;t save that categorization — try again.
         </p>
+      )}
+      {splitTarget && (
+        <SplitDialog
+          target={splitTarget}
+          categories={categories.data ?? []}
+          onClose={() => setSplitTarget(null)}
+        />
       )}
     </main>
   );
