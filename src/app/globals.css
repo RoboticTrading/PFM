@@ -1,36 +1,36 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   Default skin seed ("Walnut & Brass").
+   Default skin seed ("Daylight" — clean, friendly bank-app light theme).
    These `--pfm-*` values are the single source of truth at runtime; the
    ThemeProvider overwrites them on `:root` when the skin changes. Keep this in
-   sync with `src/lib/theme/skins.ts` (walnutBrass) — it prevents a flash of
-   unstyled color before hydration.
+   sync with `src/lib/theme/skins.ts` (daylight — the DEFAULT_SKIN_ID) — it prevents
+   a flash of unstyled color before hydration.
 --------------------------------------------------------------------------- */
 :root {
-  --pfm-base: #0a0d14;
-  --pfm-panel: #0e1118;
-  --pfm-surface: #12161f;
-  --pfm-elevated: #171c28;
-  --pfm-hover: #1c2233;
-  --pfm-card: #12161f;
-  --pfm-border: #1a1f2c;
-  --pfm-border-light: #242a3a;
-  --pfm-accent: #b4964f;
-  --pfm-accent-dim: #8a7340;
-  --pfm-accent-bright: #d4b668;
-  --pfm-fg: #d8d3c7;
-  --pfm-fg-muted: #9a9faa;
-  --pfm-fg-subtle: #6a7080;
-  --pfm-success: #5a9e6f;
-  --pfm-danger: #b05555;
-  --pfm-warning: #c49a3c;
-  --pfm-info: #5a7faa;
-  --pfm-font-display: "Cormorant Garamond", Georgia, serif;
-  --pfm-font-body: "DM Sans", system-ui, sans-serif;
-  --pfm-font-mono: "JetBrains Mono", ui-monospace, monospace;
-  --pfm-radius: 2px;
-  color-scheme: dark;
+  --pfm-base: #f4f6f9;
+  --pfm-panel: #ffffff;
+  --pfm-surface: #ffffff;
+  --pfm-elevated: #ffffff;
+  --pfm-hover: #eef2f7;
+  --pfm-card: #ffffff;
+  --pfm-border: #e6e9ef;
+  --pfm-border-light: #d5dae3;
+  --pfm-accent: #2563eb;
+  --pfm-accent-dim: #93c5fd;
+  --pfm-accent-bright: #1d4ed8;
+  --pfm-fg: #0f172a;
+  --pfm-fg-muted: #475569;
+  --pfm-fg-subtle: #94a3b8;
+  --pfm-success: #16a34a;
+  --pfm-danger: #dc2626;
+  --pfm-warning: #d97706;
+  --pfm-info: #2563eb;
+  --pfm-font-display: var(--font-inter), "Segoe UI", system-ui, sans-serif;
+  --pfm-font-body: var(--font-inter), "Segoe UI", system-ui, sans-serif;
+  --pfm-font-mono: "JetBrains Mono", "Consolas", ui-monospace, monospace;
+  --pfm-radius: 10px;
+  color-scheme: light;
 }
 
 /* ---------------------------------------------------------------------------
@@ -87,10 +87,39 @@
   --radius-sm: var(--pfm-radius);
   --radius-md: calc(var(--pfm-radius) + 2px);
   --radius-lg: calc(var(--pfm-radius) + 4px);
+
+  /* Fluent elevation — soft, low Windows 11 card/flyout depth. Additive utilities
+     (`shadow-windows`, `shadow-windows-lg`); Tailwind's default shadow scale is
+     left intact. */
+  --shadow-windows: 0 2px 8px rgba(15, 23, 42, 0.08);
+  --shadow-windows-lg: 0 4px 16px rgba(15, 23, 42, 0.12);
+  --shadow-windows-focused: 0 0 0 2px rgba(37, 99, 235, 0.45);
 }
 
 body {
   background-color: var(--pfm-base);
   color: var(--pfm-fg);
   font-family: var(--pfm-font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Windows 11-style thin, rounded scrollbars — colored from the active skin's
+   subtle-foreground role, so they re-theme automatically per skin. */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--pfm-fg-subtle) 45%, transparent);
+  border-radius: 8px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--pfm-fg-subtle) 70%, transparent);
+  background-clip: content-box;
 }

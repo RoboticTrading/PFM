@@ -69,14 +69,55 @@ export const parchment: Skin = {
   radius: walnutBrass.radius,
 };
 
+/**
+ * "Daylight" — the default skin: a clean, friendly consumer-finance look, the way
+ * a modern bank app or Quicken feels. Crisp white cards on a soft cool-gray page,
+ * a trustworthy blue accent, calm slate text, green/red money semantics, Inter
+ * type, and generously rounded corners. Deliberately NOT a corporate/analytics
+ * "board room" look. (Palette instincts carried from the earlier financialmanager
+ * attempt, warmed and softened.) Walnut & Brass stays selectable.
+ */
+export const daylight: Skin = {
+  id: "daylight",
+  label: "Daylight",
+  dark: false,
+  colors: {
+    base: "#f4f6f9", // soft cool page behind cards (calmer than flat gray)
+    panel: "#ffffff", // app chrome / nav
+    surface: "#ffffff", // primary content surface
+    elevated: "#ffffff", // modals / popovers (elevation via shadow, not color)
+    hover: "#eef2f7", // gentle cool hover/active surface
+    card: "#ffffff",
+    border: "#e6e9ef", // soft cool hairline
+    "border-light": "#d5dae3", // stronger cool divider
+    accent: "#2563eb", // blue-600 — trustworthy bank blue
+    "accent-dim": "#93c5fd", // blue-300 — idle/muted accent
+    "accent-bright": "#1d4ed8", // blue-700 — hover/emphasis (buttons darken on hover)
+    fg: "#0f172a", // slate-900 — softer than pure black
+    "fg-muted": "#475569", // slate-600 secondary
+    "fg-subtle": "#94a3b8", // slate-400 tertiary / placeholder
+    success: "#16a34a", // green-600 — positive money
+    danger: "#dc2626", // red-600 — negative money / destructive
+    warning: "#d97706", // amber-600
+    info: "#2563eb", // blue-600
+  },
+  fonts: {
+    display: "var(--font-inter), 'Segoe UI', system-ui, sans-serif",
+    body: "var(--font-inter), 'Segoe UI', system-ui, sans-serif",
+    mono: "'JetBrains Mono', 'Consolas', ui-monospace, monospace",
+  },
+  radius: "10px",
+};
+
 /** Registry of available skins, keyed by id. */
 export const SKINS: Record<string, Skin> = {
+  [daylight.id]: daylight,
   [walnutBrass.id]: walnutBrass,
   [parchment.id]: parchment,
 };
 
 /** The skin applied when none is selected. */
-export const DEFAULT_SKIN_ID = walnutBrass.id;
+export const DEFAULT_SKIN_ID = daylight.id;
 
 /** Resolve a skin by id, falling back to the default. */
 export function resolveSkin(id: string | undefined): Skin {
