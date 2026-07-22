@@ -43,6 +43,13 @@
       "when": 1781570748832,
       "tag": "0005_dizzy_umar",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784721857951,
+      "tag": "0006_large_maverick",
+      "breakpoints": true
     }
   ]
 }

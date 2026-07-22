@@ -18,6 +18,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/budgets", label: "Budgets", glyph: "▦" },
   { href: "/reports", label: "Reports", glyph: "▧" },
   { href: "/positions", label: "Positions", glyph: "◆" },
+  { href: "/system", label: "System", glyph: "⚙" },
 ] as const;
 
 /** The nav item whose section contains `pathname` (longest-prefix match). */

@@ -1,0 +1,23 @@
+# syntax=docker/dockerfile:1
+# PFM Schwab token services — the callback + refresher, run straight from TS via
+# tsx. One image, two roles (SERVICE=callback|refresher). Tiny, LAN-side infra;
+# not the Next.js app. Shares PFM's DB layer + Schwab lib.
+
+FROM node:22-alpine
+ENV PNPM_HOME=/pnpm
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile
+
+COPY tsconfig.json ./
+COPY src ./src
+
+# SERVICE selects the entrypoint: callback (public OAuth handler) or refresher
+# (the LAN-only token daemon). Default to the refresher.
+ENV SERVICE=refresher
+ENV NODE_ENV=production
+CMD ["sh", "-c", "pnpm exec tsx src/services/schwab/${SERVICE}.ts"]

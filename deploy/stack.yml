@@ -44,6 +44,55 @@ services:
       restart_policy:
         condition: any
 
+  # Schwab OAuth callback (public, behind callback.bolivardrive.com via the shared
+  # Caddy). Tiny standalone service — holds no financial data, so public exposure
+  # never touches the PFM app. Seeds financialmanager.schwab_token after a re-auth
+  # and mirrors the shared tokens.json for the (transitional) prop-desk consumers.
+  schwab-callback:
+    image: registry.prop-desk.io/pfm-schwab:latest
+    environment:
+      SERVICE: callback
+      PORT: "8076"
+      SCHWAB_APP_KEY: ${SCHWAB_APP_KEY}
+      SCHWAB_APP_SECRET: ${SCHWAB_APP_SECRET}
+      SCHWAB_CALLBACK_URL: "https://callback.bolivardrive.com/callback"
+      SCHWAB_TOKENS_FILE: "/mnt/qnap/schwab_token/tokens.json"
+      DATABASE_URL: ${DATABASE_URL}
+    extra_hosts:
+      - "data02:192.168.42.111"
+    volumes:
+      - /mnt/qnap/schwab_token:/mnt/qnap/schwab_token
+    networks:
+      - algobots_ingress
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+
+  # Schwab token refresher — the LAN-only "singleton". Keeps the 30-min access
+  # token fresh from the refresh token; idle until the first re-auth seeds a token.
+  schwab-refresher:
+    image: registry.prop-desk.io/pfm-schwab:latest
+    environment:
+      SERVICE: refresher
+      SCHWAB_APP_KEY: ${SCHWAB_APP_KEY}
+      SCHWAB_APP_SECRET: ${SCHWAB_APP_SECRET}
+      SCHWAB_REFRESH_SECONDS: "1200"
+      SCHWAB_TOKENS_FILE: "/mnt/qnap/schwab_token/tokens.json"
+      DATABASE_URL: ${DATABASE_URL}
+    extra_hosts:
+      - "data02:192.168.42.111"
+    volumes:
+      - /mnt/qnap/schwab_token:/mnt/qnap/schwab_token
+    networks:
+      - algobots_ingress
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+
   # LAN-only TLS front. Host-mode 8443 on swarm1's LAN NIC only — no public
   # route exists to it. Config + cert token live owner-only on the cluster.
   caddy:

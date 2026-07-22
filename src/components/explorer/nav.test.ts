@@ -23,6 +23,7 @@ describe("activeNav", () => {
       "/budgets",
       "/reports",
       "/positions",
+      "/system",
     ]);
   });
 });

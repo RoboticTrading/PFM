@@ -44,6 +44,11 @@ jobs:
           docker build -t "$IMG:latest" -t "$IMG:${GITHUB_SHA}" .
           docker push "$IMG:latest"
           docker push "$IMG:${GITHUB_SHA}"
+          # Schwab token services (callback + refresher) — separate tsx image.
+          SIMG=registry.prop-desk.io/pfm-schwab
+          docker build -f Dockerfile.schwab -t "$SIMG:latest" -t "$SIMG:${GITHUB_SHA}" .
+          docker push "$SIMG:latest"
+          docker push "$SIMG:${GITHUB_SHA}"
           set -a; . /mnt/qnap/config/pfm.env; set +a
           docker stack deploy --with-registry-auth --resolve-image=always \
             -c deploy/stack.yml pfm
