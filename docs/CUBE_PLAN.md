@@ -194,6 +194,23 @@ brain, many instruments.*
 - **Landed: 6,504 round-trips, both brokers, 2020–2026, every P&L validated** (tastytrade all +
   Schwab options). Cube UI shows both.
 
+## STATUS — 2026-07-25 (Phase 2c done)
+
+- **Schwab matched by broker `position_id`** (Bob's own Excel-HUD key): `match_by_position` groups a
+  position's fills; for a fully-closed position P&L = Σ signed cash (order-independent — sidesteps the
+  intraday scalp/settlement noise that broke symbol-FIFO). **Schwab futures −$524k → +$95.8k**; every
+  Schwab instrument now matches on the reliable key. `match_source` dispatches Schwab→position_id,
+  tastytrade→symbol-FIFO (still 100%).
+- **The Cube: 6,259 round-trips, +$81,516 net realized** (tastytrade −$11.8k, Schwab +$93.3k), both
+  brokers, 2020→2026, all instruments. Plus holdings (+$30.5k dividends) + broker cash flow.
+- **The waterfall** — cumulative realized-P&L equity curve, live in the cockpit (Bob's Excel HUD, automated).
+
+### Remaining (the richer HUD metrics Bob had in Excel)
+- Per-trade **%RoC · %RoR · MaxLoss · Capital** — need margin/capital per structure. And **strategy
+  grouping** (Bull Put Spread / Bear Call Spread / Short Futures) — group same-order legs into
+  verticals (the structure grouper). His HUD's power columns; DaysHeld already lands.
+- Held-position **still-opens** as live P&L (mark-to-market) — the ETFs + open futures.
+
 ### Phase 2b backlog (durable — not lost in the scroll)
 - **Schwab FUTURES P&L** — `net_amount` is the NOTIONAL, not P&L (−$524k on micro-NQ is impossible).
   Compute futures P&L from price×multiplier×qty (per-instrument multiplier), not net_amount. Then land.
