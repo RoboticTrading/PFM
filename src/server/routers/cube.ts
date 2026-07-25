@@ -6,6 +6,7 @@ import {
   cubeEquityCurve,
   cubeEtfDailySeries,
   cubeHoldingsList,
+  cubeLiquidity,
   cubeMatchHealth,
   cubeNetWorth,
   cubeOpenPositionsList,
@@ -89,4 +90,7 @@ export const cubeRouter = router({
 
   /** The net-worth cockpit — assets − liabilities across every account, one roll-up. */
   netWorth: publicProcedure.query(() => cubeNetWorth()),
+
+  /** The liquidity read — spendable cash vs revolving debt (cards + margin), the cash squeeze. */
+  liquidity: publicProcedure.query(() => cubeLiquidity()),
 });

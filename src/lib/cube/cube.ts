@@ -15,7 +15,7 @@ import {
   cubeStructures,
   cubeTrades,
 } from "@/lib/db/read-models/cube";
-import { subMoney, sumMoney } from "@/lib/money";
+import { addMoney, subMoney, sumMoney } from "@/lib/money";
 
 export interface CubeFilter {
   underlying?: string;
@@ -591,6 +591,69 @@ export async function cubeNetWorth(): Promise<NetWorth> {
     netWorth,
     etfDividends: sleeve.dividends,
   };
+}
+
+// ─── Liquidity: the cash-squeeze read (spendable cash vs revolving debt) ──────────────────
+
+export interface LiquidityDebt {
+  account: string;
+  kind: string;
+  /** Positive magnitude of what's owed. */
+  amount: string;
+}
+
+export interface Liquidity {
+  asOf: string | null;
+  /** Liquid cash on hand (checking + any non-liability cash), signed. */
+  cash: string;
+  /** Credit-card revolving debt, magnitude. */
+  cards: string;
+  /** Brokerage margin debit, magnitude. */
+  margin: string;
+  /** cards + margin — everything owed that carries interest, magnitude. */
+  revolvingDebt: string;
+  /** cash − revolvingDebt — the true "spendable minus owed" position, signed. */
+  net: string;
+  /** The revolving-debt lines (cards + margin), largest first, magnitudes. */
+  debts: LiquidityDebt[];
+}
+
+/**
+ * The liquidity read — what Bob can actually spend right now (checking cash) against what he owes
+ * on revolving credit (the cards + the brokerage margin debit). Net worth hides the cash squeeze
+ * behind illiquid house/ETF equity; this surfaces it. All from the Bob-seeded account snapshots.
+ */
+export async function cubeLiquidity(): Promise<Liquidity> {
+  const rows = await getDb()
+    .select({
+      account: sql<string>`coalesce(${cubeAccountSnapshot.account}, '—')`,
+      kind: sql<string>`coalesce(${cubeAccountSnapshot.kind}, '—')`,
+      balance: sql<string>`round(${cubeAccountSnapshot.balance}::numeric, 2)::text`,
+      isLiability: cubeAccountSnapshot.isLiability,
+      asOf: sql<string | null>`${cubeAccountSnapshot.asOf}::text`,
+    })
+    .from(cubeAccountSnapshot);
+
+  const cashRows = rows.filter((r) => !r.isLiability);
+  const cardRows = rows.filter((r) => r.isLiability && r.kind === "credit-card");
+  const marginRows = rows.filter((r) => r.isLiability && r.kind !== "credit-card");
+
+  const cash = sumMoney(cashRows.map((r) => r.balance));
+  const cards = magnitude(sumMoney(cardRows.map((r) => r.balance)));
+  const margin = magnitude(sumMoney(marginRows.map((r) => r.balance)));
+  const revolvingDebt = addMoney(cards, margin);
+  const net = subMoney(cash, revolvingDebt);
+
+  const debts: LiquidityDebt[] = [...cardRows, ...marginRows]
+    .map((r) => ({ account: r.account, kind: r.kind, amount: magnitude(r.balance) }))
+    .sort((a, b) => Number(b.amount) - Number(a.amount));
+
+  const asOf = rows.reduce<string | null>(
+    (max, r) => (r.asOf && (!max || r.asOf > max) ? r.asOf : max),
+    null,
+  );
+
+  return { asOf, cash, cards, margin, revolvingDebt, net, debts };
 }
 
 export interface EquityPoint {
