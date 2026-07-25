@@ -2,60 +2,83 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { ALL_ACCOUNTS, SPLIT_CATEGORY } from "@/lib/accounts/register-types";
+import { CategoryPicker } from "@/components/categories/CategoryPicker";
+import { ALL_ACCOUNTS } from "@/lib/accounts/register-types";
 import { formatUsd } from "@/lib/money";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 
+import { EMPTY_FACETS, filterTransactions, type TxnFacets } from "./filter";
 import { SplitDialog, type SplitTarget } from "./SplitDialog";
+import { TxnFilterBar } from "./TxnFilterBar";
 
 /**
- * Transactions workspace — pick an account, then categorize its register inline.
- * The Category cell is a live `<select>` backed by `categories.categorize`
- * (replaces any prior categorization; lineage by source_txn_id, never copied).
+ * Transactions workspace — pick an account (or all), filter the register, and
+ * categorize inline. The category control is a searchable tree picker backed by
+ * `categories.categorize` (replaces any prior categorization; lineage by
+ * source_txn_id, never copied). Splits, bulk assignment, and an uncategorized
+ * burn-down all run against the unified `cube.v_ledger`.
  */
 export function TransactionsWorkspace() {
   const accounts = trpc.accounts.list.useQuery();
   const [accountId, setAccountId] = useState<string>("");
 
-  // Default to the first account once loaded.
+  // Default to "All accounts" once accounts load — the whole ledger, unified.
   useEffect(() => {
     if (!accountId && accounts.data && accounts.data.length > 0) {
-      setAccountId(accounts.data[0].id);
+      setAccountId(ALL_ACCOUNTS);
     }
   }, [accountId, accounts.data]);
 
   const categories = trpc.categories.list.useQuery();
   const register = trpc.transactions.forAccount.useQuery(
-    { accountId, limit: 500 },
+    { accountId, limit: 1000 },
     { enabled: accountId !== "" },
   );
 
   const utils = trpc.useUtils();
-  const [savingId, setSavingId] = useState<string | null>(null);
+  const invalidateRegister = () =>
+    void utils.transactions.forAccount.invalidate();
+
+  const [savingKey, setSavingKey] = useState<string | null>(null);
   const [splitTarget, setSplitTarget] = useState<SplitTarget | null>(null);
   const categorize = trpc.categories.categorize.useMutation({
     onSettled: () => {
-      void utils.transactions.forAccount.invalidate();
-      setSavingId(null);
+      invalidateRegister();
+      setSavingKey(null);
     },
   });
 
+  const [facets, setFacets] = useState<TxnFacets>(EMPTY_FACETS);
   const rows = useMemo(() => register.data ?? [], [register.data]);
+  const filtered = useMemo(
+    () => filterTransactions(rows, facets),
+    [rows, facets],
+  );
   const uncategorized = useMemo(
     () => rows.filter((r) => !r.categoryId).length,
     [rows],
   );
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [bulkCategory, setBulkCategory] = useState("");
+  const [bulkCategory, setBulkCategory] = useState<string | null>(null);
   const bulk = trpc.categories.categorizeBulk.useMutation({
     onSuccess: () => {
-      void utils.transactions.forAccount.invalidate();
+      invalidateRegister();
       setSelected(new Set());
-      setBulkCategory("");
+      setBulkCategory(null);
     },
   });
+
+  // Clearing/changing the visible set drops any now-hidden selections.
+  const visibleKeys = useMemo(
+    () => new Set(filtered.map((t) => `${t.sourceSchema}:${t.sourceTxnId}`)),
+    [filtered],
+  );
+  const selectedVisible = useMemo(
+    () => [...selected].filter((k) => visibleKeys.has(k)),
+    [selected, visibleKeys],
+  );
 
   function toggleRow(key: string) {
     setSelected((s) => {
@@ -68,16 +91,21 @@ export function TransactionsWorkspace() {
 
   function applyBulk() {
     if (!bulkCategory) return;
-    const txns = rows
-      .filter((t) => selected.has(`${t.sourceSchema}:${t.sourceTxnId}`))
+    const chosen = new Set(selectedVisible);
+    const txns = filtered
+      .filter((t) => chosen.has(`${t.sourceSchema}:${t.sourceTxnId}`))
       .map((t) => ({
         sourceSchema: t.sourceSchema,
         sourceTxnId: t.sourceTxnId,
         txnDate: t.date.slice(0, 10),
         amount: t.amount,
       }));
-    bulk.mutate({ categoryId: bulkCategory, txns });
+    if (txns.length > 0) bulk.mutate({ categoryId: bulkCategory, txns });
   }
+
+  const pickerCats = categories.data ?? [];
+
+  const uncategorizedActive = facets.category === "uncategorized";
 
   return (
     <main className="px-8 py-6">
@@ -87,9 +115,27 @@ export function TransactionsWorkspace() {
             Transactions
           </h1>
           <p className="text-sm text-fg-muted">
-            Categorize an account&rsquo;s register · {rows.length} shown
+            Categorize the ledger · {filtered.length} shown
             {uncategorized > 0 && (
-              <span className="text-fg-subtle"> · {uncategorized} uncategorized</span>
+              <>
+                {" · "}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFacets((f) => ({
+                      ...f,
+                      category: uncategorizedActive ? "all" : "uncategorized",
+                    }))
+                  }
+                  className={cn(
+                    "underline-offset-2 outline-none hover:underline focus-visible:underline",
+                    uncategorizedActive ? "text-accent" : "text-fg-subtle",
+                  )}
+                >
+                  {uncategorized} uncategorized
+                  {uncategorizedActive ? " (filtering)" : ""}
+                </button>
+              </>
             )}
           </p>
         </div>
@@ -110,28 +156,29 @@ export function TransactionsWorkspace() {
         </label>
       </header>
 
-      {selected.size > 0 && (
+      {selectedVisible.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-3 rounded-md border border-border bg-card p-3">
-          <span className="text-sm font-medium text-fg">{selected.size} selected</span>
-          <select
-            value={bulkCategory}
-            onChange={(e) => setBulkCategory(e.target.value)}
-            className="rounded-md border border-border bg-base px-2 py-1.5 text-sm text-fg outline-none focus-visible:border-accent"
-          >
-            <option value="">Assign category…</option>
-            {(categories.data ?? []).map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.kind} · {c.name}
-              </option>
-            ))}
-          </select>
+          <span className="text-sm font-medium text-fg">
+            {selectedVisible.length} selected
+          </span>
+          <div className="w-64">
+            <CategoryPicker
+              categories={pickerCats}
+              value={bulkCategory}
+              onSelect={setBulkCategory}
+              placeholder="Assign category…"
+              ariaLabel="Bulk category"
+            />
+          </div>
           <button
             type="button"
             onClick={applyBulk}
             disabled={!bulkCategory || bulk.isPending}
             className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground outline-none transition-colors hover:bg-accent-bright disabled:opacity-40"
           >
-            {bulk.isPending ? "Applying…" : "Apply to all"}
+            {bulk.isPending
+              ? "Applying…"
+              : `Apply to ${selectedVisible.length}`}
           </button>
           <button
             type="button"
@@ -144,12 +191,20 @@ export function TransactionsWorkspace() {
       )}
 
       <div className="rounded-md border border-border bg-base">
+        <TxnFilterBar
+          facets={facets}
+          onChange={setFacets}
+          showing={filtered.length}
+          total={rows.length}
+        />
         {register.isLoading ? (
           <p className="p-4 text-sm text-fg-muted">Loading transactions…</p>
         ) : register.isError ? (
           <p className="p-4 text-sm text-danger">Failed to load transactions.</p>
         ) : rows.length === 0 ? (
           <p className="p-4 text-sm text-fg-muted">No transactions for this account.</p>
+        ) : filtered.length === 0 ? (
+          <p className="p-4 text-sm text-fg-muted">No transactions match these filters.</p>
         ) : (
           <table className="w-full text-sm">
             <thead>
@@ -158,11 +213,18 @@ export function TransactionsWorkspace() {
                   <input
                     type="checkbox"
                     aria-label="Select all"
-                    checked={rows.length > 0 && selected.size === rows.length}
+                    checked={
+                      filtered.length > 0 &&
+                      selectedVisible.length === filtered.length
+                    }
                     onChange={(e) =>
                       setSelected(
                         e.target.checked
-                          ? new Set(rows.map((r) => `${r.sourceSchema}:${r.sourceTxnId}`))
+                          ? new Set(
+                              filtered.map(
+                                (r) => `${r.sourceSchema}:${r.sourceTxnId}`,
+                              ),
+                            )
                           : new Set(),
                       )
                     }
@@ -175,10 +237,10 @@ export function TransactionsWorkspace() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((t) => {
+              {filtered.map((t) => {
                 const key = `${t.sourceSchema}:${t.sourceTxnId}`;
                 const negative = t.amount.startsWith("-");
-                const saving = savingId === key && categorize.isPending;
+                const saving = savingKey === key && categorize.isPending;
                 return (
                   <tr key={key} className="border-b border-border last:border-0">
                     <td className="px-3 py-1.5">
@@ -195,17 +257,13 @@ export function TransactionsWorkspace() {
                     <td className="px-3 py-1.5 text-fg">{t.description}</td>
                     <td className="px-3 py-1.5">
                       <div className="flex items-center gap-2">
-                        {t.categoryId === SPLIT_CATEGORY ? (
-                          <span className="text-sm text-info">split</span>
-                        ) : (
-                          <select
-                            aria-label="Category"
-                            value={t.categoryId ?? ""}
+                        <div className="w-56">
+                          <CategoryPicker
+                            categories={pickerCats}
+                            value={t.categoryId}
                             disabled={saving}
-                            onChange={(e) => {
-                              const categoryId = e.target.value;
-                              if (!categoryId) return;
-                              setSavingId(key);
+                            onSelect={(categoryId) => {
+                              setSavingKey(key);
                               categorize.mutate({
                                 sourceSchema: t.sourceSchema,
                                 sourceTxnId: t.sourceTxnId,
@@ -214,19 +272,8 @@ export function TransactionsWorkspace() {
                                 amount: t.amount,
                               });
                             }}
-                            className={cn(
-                              "max-w-[14rem] rounded-md border border-border bg-card px-2 py-1 text-sm outline-none focus-visible:border-accent",
-                              t.categoryId ? "text-fg" : "text-fg-subtle italic",
-                            )}
-                          >
-                            <option value="">uncategorized</option>
-                            {(categories.data ?? []).map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.kind} · {c.name}
-                              </option>
-                            ))}
-                          </select>
-                        )}
+                          />
+                        </div>
                         <button
                           type="button"
                           onClick={() =>

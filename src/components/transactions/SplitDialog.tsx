@@ -2,6 +2,10 @@
 
 import { useMemo, useState } from "react";
 
+import {
+  CategoryPicker,
+  type PickerCategory,
+} from "@/components/categories/CategoryPicker";
 import { formatUsd, fromScaled, sumMoney, toScaled } from "@/lib/money";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
@@ -14,12 +18,6 @@ export interface SplitTarget {
   txnDate: string; // YYYY-MM-DD
   total: string;
   description: string;
-}
-
-interface CategoryOption {
-  id: string;
-  name: string;
-  kind: string;
 }
 
 interface SplitRow {
@@ -35,7 +33,7 @@ export function SplitDialog({
   onClose,
 }: {
   target: SplitTarget;
-  categories: CategoryOption[];
+  categories: PickerCategory[];
   onClose: () => void;
 }) {
   const [rows, setRows] = useState<SplitRow[]>([
@@ -87,18 +85,16 @@ export function SplitDialog({
         <div className="space-y-2">
           {rows.map((r, i) => (
             <div key={i} className="flex items-center gap-2">
-              <select
-                value={r.categoryId}
-                onChange={(e) => setRow(i, { categoryId: e.target.value })}
-                className="min-w-0 flex-1 rounded-md border border-border bg-base px-2 py-1.5 text-sm text-fg outline-none focus-visible:border-accent"
-              >
-                <option value="">Select category…</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.kind} · {c.name}
-                  </option>
-                ))}
-              </select>
+              <div className="min-w-0 flex-1">
+                <CategoryPicker
+                  categories={categories}
+                  value={r.categoryId || null}
+                  onSelect={(categoryId) => setRow(i, { categoryId })}
+                  placeholder="Select category…"
+                  ariaLabel={`Split ${i + 1} category`}
+                  className="py-1.5"
+                />
+              </div>
               <input
                 value={r.amount}
                 onChange={(e) => setRow(i, { amount: e.target.value })}

@@ -17,28 +17,14 @@ interface CategorySeed {
 }
 
 /**
- * The default Category hierarchy: three kind-roots plus common children.
- * Names are globally unique → seeding is idempotent (insert-or-ignore).
+ * The default Category hierarchy: ONLY the three kind-roots. Sub-categories are
+ * the owner's to build — we never seed them. Names are globally unique → seeding
+ * is idempotent (insert-or-ignore), so this is safe to run on every boot.
  */
 export const CATEGORY_SEEDS: readonly CategorySeed[] = [
-  // roots
   { name: "Income", kind: "Income", parent: null },
   { name: "Expense", kind: "Expense", parent: null },
   { name: "Transfer", kind: "Transfer", parent: null },
-  // income
-  { name: "Salary", kind: "Income", parent: "Income" },
-  { name: "Investment Income", kind: "Income", parent: "Income" },
-  // expense
-  { name: "Groceries", kind: "Expense", parent: "Expense" },
-  { name: "Dining", kind: "Expense", parent: "Expense" },
-  { name: "Housing", kind: "Expense", parent: "Expense" },
-  { name: "Utilities", kind: "Expense", parent: "Expense" },
-  { name: "Transportation", kind: "Expense", parent: "Expense" },
-  { name: "Healthcare", kind: "Expense", parent: "Expense" },
-  { name: "Entertainment", kind: "Expense", parent: "Expense" },
-  { name: "Shopping", kind: "Expense", parent: "Expense" },
-  // transfer
-  { name: "Account Transfer", kind: "Transfer", parent: "Transfer" },
 ] as const;
 
 /**

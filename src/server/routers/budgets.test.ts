@@ -12,6 +12,7 @@ import { appRouter } from "./_app";
 const call = createCallerFactory(appRouter)(createContext());
 const PERIOD = "2099-07";
 const TEST_TXN = "__test_budget_txn";
+const TEST_CAT = "__test_budget_cat";
 
 describeDb("budgets: setBudget + budgetVsActual (live MyDB)", () => {
   afterAll(async () => {
@@ -20,24 +21,32 @@ describeDb("budgets: setBudget + budgetVsActual (live MyDB)", () => {
     await db
       .delete(schema.transactionCategory)
       .where(eq(schema.transactionCategory.sourceTxnId, TEST_TXN));
+    await db.delete(schema.category).where(eq(schema.category.name, TEST_CAT));
     await db
       .delete(schema.auditLog)
       .where(inArray(schema.auditLog.action, ["setBudget", "categorize"]));
     await getSql().end({ timeout: 5 });
   });
 
-  async function categoryId(name: string): Promise<string> {
-    const [c] = await getDb()
+  /** Self-provision a test category (the tree is roots-only; sub-categories are the owner's). */
+  async function testCategoryId(): Promise<string> {
+    const db = getDb();
+    const [existing] = await db
       .select({ id: schema.category.id })
       .from(schema.category)
-      .where(eq(schema.category.name, name))
+      .where(eq(schema.category.name, TEST_CAT))
       .limit(1);
+    if (existing) return existing.id;
+    const [c] = await db
+      .insert(schema.category)
+      .values({ name: TEST_CAT, kind: "Expense" })
+      .returning({ id: schema.category.id });
     return c.id;
   }
 
   it("computes budget vs actual for the period", async () => {
     await seedCategories(getDb());
-    const groceries = await categoryId("Groceries");
+    const groceries = await testCategoryId();
 
     await call.budgets.setBudget({
       categoryId: groceries,
@@ -63,7 +72,7 @@ describeDb("budgets: setBudget + budgetVsActual (live MyDB)", () => {
   });
 
   it("setBudget upserts the amount for the same category+period", async () => {
-    const groceries = await categoryId("Groceries");
+    const groceries = await testCategoryId();
     await call.budgets.setBudget({
       categoryId: groceries,
       period: PERIOD,

@@ -16,30 +16,45 @@ const RANGE = { from: "2099-08-01", to: "2099-08-31" };
 const TXNS = ["__test_report_income", "__test_report_expense"];
 
 describeDb("reports: categoryReport / cashFlow / netWorth (live MyDB)", () => {
+  const TEST_CATS = ["__test_report_salary", "__test_report_groceries"];
+
   afterAll(async () => {
     const db = getDb();
     await db
       .delete(schema.transactionCategory)
       .where(inArray(schema.transactionCategory.sourceTxnId, TXNS));
     await db
+      .delete(schema.category)
+      .where(inArray(schema.category.name, TEST_CATS));
+    await db
       .delete(schema.auditLog)
       .where(eq(schema.auditLog.action, "categorize"));
     await getSql().end({ timeout: 5 });
   });
 
-  async function categoryId(name: string): Promise<string> {
-    const [c] = await getDb()
+  /** Self-provision a test category (the tree is roots-only; sub-categories are the owner's). */
+  async function testCategoryId(
+    name: string,
+    kind: "Income" | "Expense" | "Transfer",
+  ): Promise<string> {
+    const db = getDb();
+    const [existing] = await db
       .select({ id: schema.category.id })
       .from(schema.category)
       .where(eq(schema.category.name, name))
       .limit(1);
+    if (existing) return existing.id;
+    const [c] = await db
+      .insert(schema.category)
+      .values({ name, kind })
+      .returning({ id: schema.category.id });
     return c.id;
   }
 
   it("categoryReport + cashFlow are decimal-correct over the range", async () => {
     await seedCategories(getDb());
-    const salary = await categoryId("Salary");
-    const groceries = await categoryId("Groceries");
+    const salary = await testCategoryId(TEST_CATS[0], "Income");
+    const groceries = await testCategoryId(TEST_CATS[1], "Expense");
 
     await call.categories.categorize({
       sourceSchema: "schwab_checking",

@@ -279,6 +279,96 @@ export const categoriesRouter = router({
     },
   }),
 
+  /**
+   * Re-parent (nest) a category under a different node. The moved node — and all
+   * its descendants — inherit the new parent's `kind`, so the tree stays kind-
+   * consistent. Guards: the three kind-roots are fixed (can't be moved), a node
+   * can't become its own ancestor (no cycles), and the parent must exist.
+   */
+  setParent: defineAction({
+    name: "setParentCategory",
+    input: z.object({
+      id: z.string().uuid(),
+      parentId: z.string().uuid(),
+    }),
+    target: (input) => input.id,
+    handler: async ({ input, tx }) => {
+      if (input.id === input.parentId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "A category cannot be its own parent.",
+        });
+      }
+      const all = await tx
+        .select({
+          id: schema.category.id,
+          parentId: schema.category.parentId,
+          kind: schema.category.kind,
+        })
+        .from(schema.category);
+
+      const node = all.find((c) => c.id === input.id);
+      if (!node) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Category not found." });
+      }
+      if (node.parentId === null) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Root categories (Income / Expense / Transfer) are fixed.",
+        });
+      }
+      const parent = all.find((c) => c.id === input.parentId);
+      if (!parent) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Target parent not found.",
+        });
+      }
+
+      // Collect the moved node's descendants; the new parent must not be one of
+      // them (that would create a cycle), and they all inherit the new kind.
+      const childrenByParent = new Map<string, string[]>();
+      for (const c of all) {
+        if (!c.parentId) continue;
+        const list = childrenByParent.get(c.parentId) ?? [];
+        list.push(c.id);
+        childrenByParent.set(c.parentId, list);
+      }
+      const subtree = new Set<string>([input.id]);
+      const stack = [input.id];
+      while (stack.length > 0) {
+        const cur = stack.pop() as string;
+        for (const child of childrenByParent.get(cur) ?? []) {
+          if (!subtree.has(child)) {
+            subtree.add(child);
+            stack.push(child);
+          }
+        }
+      }
+      if (subtree.has(input.parentId)) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Can't nest a category under one of its own descendants.",
+        });
+      }
+
+      const now = new Date();
+      // Re-parent the node and align the whole subtree's kind to the new parent.
+      await tx
+        .update(schema.category)
+        .set({ parentId: input.parentId, kind: parent.kind, updatedAt: now })
+        .where(eq(schema.category.id, input.id));
+      for (const descendantId of subtree) {
+        if (descendantId === input.id) continue;
+        await tx
+          .update(schema.category)
+          .set({ kind: parent.kind, updatedAt: now })
+          .where(eq(schema.category.id, descendantId));
+      }
+      return { id: input.id, parentId: input.parentId, kind: parent.kind };
+    },
+  }),
+
   /** Assign one category to many transactions at once (replaces each prior
    *  categorization). One audit row records the category + count. */
   categorizeBulk: defineAction({

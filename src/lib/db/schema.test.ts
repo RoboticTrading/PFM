@@ -49,11 +49,11 @@ describeDb("financialmanager schema (live MyDB)", () => {
     }
   });
 
-  it("seeds the category hierarchy idempotently (>=12, all 3 kinds)", async () => {
+  it("seeds the three category roots idempotently (Income/Expense/Transfer)", async () => {
     const first = await seedCategories(getDb());
     const second = await seedCategories(getDb());
     expect(second).toBe(first); // idempotent: no growth on re-run
-    expect(second).toBeGreaterThanOrEqual(12);
+    expect(second).toBeGreaterThanOrEqual(3); // roots-only seed; sub-categories are the owner's
 
     const kinds = await getDb()
       .selectDistinct({ kind: schema.category.kind })
