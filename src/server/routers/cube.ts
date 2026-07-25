@@ -7,6 +7,7 @@ import {
   cubeEtfDailySeries,
   cubeHoldingsList,
   cubeMatchHealth,
+  cubeNetWorth,
   cubeOpenPositionsList,
   cubePerformance,
   cubePropertyDailySeries,
@@ -85,4 +86,7 @@ export const cubeRouter = router({
 
   /** Broker money movement by category — deposits, interest, fees, dividends. */
   cashFlow: publicProcedure.query(() => cubeCashFlowByCategory()),
+
+  /** The net-worth cockpit — assets − liabilities across every account, one roll-up. */
+  netWorth: publicProcedure.query(() => cubeNetWorth()),
 });

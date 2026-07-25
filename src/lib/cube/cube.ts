@@ -3,6 +3,7 @@ import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import {
   type CubeDimension,
+  cubeAccountSnapshot,
   cubeCashFlows,
   cubeHoldings,
   cubeEtfDaily,
@@ -14,6 +15,7 @@ import {
   cubeStructures,
   cubeTrades,
 } from "@/lib/db/read-models/cube";
+import { subMoney, sumMoney } from "@/lib/money";
 
 export interface CubeFilter {
   underlying?: string;
@@ -499,6 +501,96 @@ export async function cubeOpenPositionsList(): Promise<OpenPositionRow[]> {
     })
     .from(cubeOpenPositions)
     .orderBy(desc(sql`abs(coalesce(${cubeOpenPositions.unrealizedPnl},0))`)) as Promise<OpenPositionRow[]>;
+}
+
+// ─── Net worth: the cockpit roll-up (assets − liabilities across every account) ──────────
+
+export interface NetWorthLine {
+  label: string;
+  /** USD money string, positive magnitude (liabilities are shown as what's owed). */
+  amount: string;
+}
+
+export interface NetWorth {
+  assets: NetWorthLine[];
+  liabilities: NetWorthLine[];
+  totalAssets: string;
+  totalLiabilities: string;
+  netWorth: string;
+  etfDividends: string; // income the covered-call sleeve has thrown off, all-time
+}
+
+/** strip a leading minus — turn a signed money string into its positive magnitude. */
+function magnitude(value: string): string {
+  return value.startsWith("-") ? value.slice(1) : value;
+}
+
+/**
+ * The net-worth roll-up — Bob's whole balance sheet in one shot. Assets (house + ETF sleeve
+ * market value + car + checking) minus liabilities (brokerage margin debit + credit cards).
+ * The ETF sleeve and the margin both live in the Schwab brokerage account: the holdings are the
+ * asset, the margin balance is the liability. Point-in-time balances come from cube.account_snapshot
+ * (Bob-seeded); marked assets come from the live cube facts.
+ */
+export async function cubeNetWorth(): Promise<NetWorth> {
+  const db = getDb();
+  const [[sleeve], houseRow, carRow, accounts] = await Promise.all([
+    db
+      .select({
+        marketValue: sql<string>`round(coalesce(sum(${cubeHoldings.marketValue}),0)::numeric,2)::text`,
+        dividends: sql<string>`round(coalesce(sum(${cubeHoldings.dividendsReceived}),0)::numeric,2)::text`,
+      })
+      .from(cubeHoldings),
+    db
+      .select({ value: sql<string>`round(${cubePropertyDaily.value}::numeric,2)::text` })
+      .from(cubePropertyDaily)
+      .where(eq(cubePropertyDaily.propertyKey, "bolivar_dr"))
+      .orderBy(desc(cubePropertyDaily.d))
+      .limit(1),
+    db
+      .select({ value: sql<string>`round(${cubePropertyDaily.value}::numeric,2)::text` })
+      .from(cubePropertyDaily)
+      .where(eq(cubePropertyDaily.propertyKey, "ford_explorer"))
+      .orderBy(desc(cubePropertyDaily.d))
+      .limit(1),
+    db
+      .select({
+        account: cubeAccountSnapshot.account,
+        balance: sql<string>`round(${cubeAccountSnapshot.balance}::numeric,2)::text`,
+        isLiability: cubeAccountSnapshot.isLiability,
+      })
+      .from(cubeAccountSnapshot)
+      .orderBy(desc(sql`abs(${cubeAccountSnapshot.balance})`)),
+  ]);
+
+  const house = houseRow[0]?.value ?? "0";
+  const car = carRow[0]?.value ?? "0";
+  const cashAccounts = accounts.filter((a) => !a.isLiability);
+  const liabilityAccounts = accounts.filter((a) => a.isLiability);
+
+  const assets: NetWorthLine[] = [
+    { label: "House · Bolivar Dr", amount: house },
+    { label: "ETF sleeve (market value)", amount: sleeve.marketValue },
+    { label: "Car · Ford Explorer", amount: car },
+    ...cashAccounts.map((a) => ({ label: a.account ?? "—", amount: a.balance })),
+  ];
+  const liabilities: NetWorthLine[] = liabilityAccounts.map((a) => ({
+    label: a.account ?? "—",
+    amount: magnitude(a.balance),
+  }));
+
+  const totalAssets = sumMoney(assets.map((a) => a.amount));
+  const totalLiabilities = sumMoney(liabilities.map((l) => l.amount));
+  const netWorth = subMoney(totalAssets, totalLiabilities);
+
+  return {
+    assets,
+    liabilities,
+    totalAssets,
+    totalLiabilities,
+    netWorth,
+    etfDividends: sleeve.dividends,
+  };
 }
 
 export interface EquityPoint {

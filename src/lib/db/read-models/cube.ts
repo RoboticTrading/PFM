@@ -1,4 +1,4 @@
-import { bigint, date, integer, numeric, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
+import { bigint, boolean, date, integer, numeric, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
 
 /**
  * READ-ONLY read-models over the `cube` schema — the unified financial warehouse.
@@ -159,6 +159,19 @@ export const cubeOpenPositions = cube.table("open_positions", {
   pointValue: numeric("point_value"),
   marketValue: numeric("market_value"),
   unrealizedPnl: numeric("unrealized_pnl"),
+});
+
+/**
+ * Point-in-time account balances Bob seeds (checking, brokerage margin, credit cards) — the
+ * cash-side facts the trade engine can't reconstruct. Positive = asset, negative = owed; the
+ * `is_liability` flag makes the sign explicit for the net-worth roll-up.
+ */
+export const cubeAccountSnapshot = cube.table("account_snapshot", {
+  account: text("account"),
+  kind: text("kind"), // checking | brokerage | credit-card
+  balance: numeric("balance"),
+  asOf: date("as_of"),
+  isLiability: boolean("is_liability"),
 });
 
 /** Broker money movement — deposits, interest, fees, dividends (the money in/out at the broker). */
