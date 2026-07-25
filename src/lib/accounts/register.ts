@@ -153,6 +153,9 @@ function baseConditions(q: RegisterQuery): SQL[] {
   // not income/expense. The matched positions already roll up as Income/Trading in cube.structures,
   // so drop the raw trade-view rows from the categorization register (dividends/fees/transfers stay).
   conds.push(sql`${cubeVLedger.sourceSchema} NOT LIKE '%v_trade_transactions'`);
+  // The covered-call ETF sleeve dividends ("GLOBAL X …") are already income in cube.holdings_income
+  // (the sleeve). Exclude them here so they aren't double-counted when categorized.
+  conds.push(sql`${cubeVLedger.description} NOT ILIKE 'GLOBAL X%'`);
 
   const text = q.query?.trim();
   if (text) {

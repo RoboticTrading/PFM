@@ -55,13 +55,21 @@ export async function listLedgerTransactions(
   accountKey?: string,
   opts: ListOpts = {},
 ): Promise<CanonicalTxn[]> {
-  // Trade legs (options/futures/equity fills) aren't categorizable transactions — they belong to
-  // matched positions (cube.structures, already Income/Trading). Exclude the raw trade-view rows.
-  const notTradeLeg = sql`${cubeVLedger.sourceSchema} NOT LIKE '%v_trade_transactions'`;
+  // Trade legs aren't categorizable (they belong to matched positions, already Income/Trading), and
+  // the covered-call ETF sleeve dividends ("GLOBAL X …") are already income in cube.holdings_income —
+  // exclude both so nothing is double-counted or mis-categorized.
+  const notCategorizableTrade = and(
+    sql`${cubeVLedger.sourceSchema} NOT LIKE '%v_trade_transactions'`,
+    sql`${cubeVLedger.description} NOT ILIKE 'GLOBAL X%'`,
+  );
   const rows = await getDb()
     .select()
     .from(cubeVLedger)
-    .where(accountKey ? and(eq(cubeVLedger.accountKey, accountKey), notTradeLeg) : notTradeLeg)
+    .where(
+      accountKey
+        ? and(eq(cubeVLedger.accountKey, accountKey), notCategorizableTrade)
+        : notCategorizableTrade,
+    )
     .orderBy(desc(cubeVLedger.txnDate), desc(cubeVLedger.sourceTxnId))
     .limit(opts.limit ?? DEFAULT_LIMIT);
 
