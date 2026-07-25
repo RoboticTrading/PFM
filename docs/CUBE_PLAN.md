@@ -184,7 +184,25 @@ brain, many instruments.*
   option-adjustment/corp-action mapping (OCC adjustment memos, or a split-factor table) BEFORE the
   expiry pass — else expiry would mis-flatten a split position that was actually closed.
 
-**Next (Phase 2, needs Bob's eyes on the scorecard first — it touches real P&L assumptions):**
-expiry pass (worthless-vs-assigned needs settlement data) + corp-action guard → Schwab adapter →
-`cube.*` landing → PFM read-models/tRPC/Explorer. The engine core — the hard, unique part — is done
-and honest.
+## STATUS — 2026-07-25 (Phase 2 done)
+
+- **Expiry pass + auto corp-action guard** — two-pass `match_all`: pass 1 finds the split signature
+  (close-without-open) → guard; pass 2 flattens past-expiry option lots (worthless-assumed,
+  `matched_via='expiry'`) EXCEPT on guarded underlyings. Auto-caught AAPL. tastytrade equity-option
+  still-open **372 → 10**; ~99% matched.
+- **Schwab adapter** (`v_trade_transactions`) — options match **100%** (+$7.9k, recent NDX 0-DTE).
+- **Landed: 6,504 round-trips, both brokers, 2020–2026, every P&L validated** (tastytrade all +
+  Schwab options). Cube UI shows both.
+
+### Phase 2b backlog (durable — not lost in the scroll)
+- **Schwab FUTURES P&L** — `net_amount` is the NOTIONAL, not P&L (−$524k on micro-NQ is impossible).
+  Compute futures P&L from price×multiplier×qty (per-instrument multiplier), not net_amount. Then land.
+- **Schwab EQUITY / held ETFs** — QYLD/RYLD/XYLD are dividend HOLDINGS (bought, never sold → correctly
+  still-open), not trades → belong in a `cube.holdings_income` fact (basis + dividends via
+  `etf_transactions`/`etf_basis`), not `cube.trades`. Split trades from holdings.
+- **AAPL split (corp-action)** — needs an OCC option-adjustment / split-factor mapping to re-symbol
+  pre-split legs so they pair with post-split closes (the guard currently leaves them as leftovers).
+- **ITM assignments** — `Receive Deliver` rows close assigned options (not worthless) + spawn an
+  equity/future lot; the one worthless-assumption caveat in the expiry P&L.
+- **cube.cash_flows** — fold broker Money-Movement into PFM's existing cash-flow.
+- **Richer PFM views** — a Performance page + a Match-Health page; the NL-query agent endgame.
