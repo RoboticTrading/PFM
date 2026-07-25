@@ -5,6 +5,7 @@ import { accountsRouter } from "./accounts";
 import { balancesRouter } from "./balances";
 import { budgetsRouter } from "./budgets";
 import { categoriesRouter } from "./categories";
+import { cubeRouter } from "./cube";
 import { positionsRouter } from "./positions";
 import { reportsRouter } from "./reports";
 import { schwabRouter } from "./schwab";
@@ -15,6 +16,7 @@ export const appRouter = router({
   balances: balancesRouter,
   budgets: budgetsRouter,
   categories: categoriesRouter,
+  cube: cubeRouter,
   positions: positionsRouter,
   reports: reportsRouter,
   schwab: schwabRouter,
