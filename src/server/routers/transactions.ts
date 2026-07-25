@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-import { accountRegister } from "@/lib/accounts/register";
+import { accountRegister, registerPage } from "@/lib/accounts/register";
+import { ALL_ACCOUNTS } from "@/lib/accounts/register-types";
 
 import { publicProcedure, router } from "../trpc";
 
@@ -20,5 +21,43 @@ export const transactionsRouter = router({
     )
     .query(({ input }) =>
       accountRegister(input.accountId, { limit: input.limit }),
+    ),
+
+  /**
+   * A filtered, paginated page of the unified ledger, driven SERVER-side so the
+   * workspace can burn down uncategorized transactions across the FULL history
+   * (not just the newest window). Every facet — categorized-state, account,
+   * description search, amount sign, date range — runs in SQL. Returns the page
+   * plus `total` (all filters) and `uncategorized` (non-category filters) counts,
+   * so the header reflects the real remaining work. Read-only; lineage by
+   * (source_schema, source_txn_id). `accountId` is the cube `account_key`; the
+   * {@link ALL_ACCOUNTS} sentinel spans every account unified.
+   */
+  page: publicProcedure
+    .input(
+      z.object({
+        accountId: z.string().min(1),
+        /** "all" | "categorized" | "uncategorized" | split sentinel | uuid. */
+        category: z.string().default("all"),
+        query: z.string().default(""),
+        direction: z.enum(["all", "in", "out"]).default("all"),
+        from: z.string().default(""),
+        to: z.string().default(""),
+        limit: z.number().int().min(1).max(500).default(200),
+        offset: z.number().int().min(0).default(0),
+      }),
+    )
+    .query(({ input }) =>
+      registerPage({
+        accountKey:
+          input.accountId === ALL_ACCOUNTS ? undefined : input.accountId,
+        category: input.category,
+        query: input.query,
+        direction: input.direction,
+        from: input.from || undefined,
+        to: input.to || undefined,
+        limit: input.limit,
+        offset: input.offset,
+      }),
     ),
 });

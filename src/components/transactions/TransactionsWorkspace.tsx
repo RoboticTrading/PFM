@@ -1,5 +1,6 @@
 "use client";
 
+import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 import { CategoryPicker } from "@/components/categories/CategoryPicker";
@@ -8,16 +9,25 @@ import { formatUsd } from "@/lib/money";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 
-import { EMPTY_FACETS, filterTransactions, type TxnFacets } from "./filter";
+import { EMPTY_FACETS, type TxnFacets } from "./filter";
 import { SplitDialog, type SplitTarget } from "./SplitDialog";
 import { TxnFilterBar } from "./TxnFilterBar";
 
+const PAGE_SIZE = 200;
+
 /**
  * Transactions workspace — pick an account (or all), filter the register, and
- * categorize inline. The category control is a searchable tree picker backed by
- * `categories.categorize` (replaces any prior categorization; lineage by
- * source_txn_id, never copied). Splits, bulk assignment, and an uncategorized
- * burn-down all run against the unified `cube.v_ledger`.
+ * categorize inline. Filtering + the uncategorized burn-down run SERVER-side
+ * against the unified `cube.v_ledger` (LEFT-joined to the categorizations), so
+ * paging spans the FULL history and the "M uncategorized" count is real — not a
+ * client-side tally of a loaded window. The category control is a searchable
+ * tree picker backed by `categories.categorize` (replaces any prior
+ * categorization; lineage by source_txn_id, never copied).
+ *
+ * Selection is intentionally PER PAGE: the header checkbox selects only the rows
+ * currently visible (≤ one page ≤ 200, safely under the bulk cap). There is no
+ * "select all N matching across pages" — that would risk a silent mass-assign
+ * over thousands of rows. To categorize a large set, page through and apply.
  */
 export function TransactionsWorkspace() {
   const accounts = trpc.accounts.list.useQuery();
@@ -31,14 +41,35 @@ export function TransactionsWorkspace() {
   }, [accountId, accounts.data]);
 
   const categories = trpc.categories.list.useQuery();
-  const register = trpc.transactions.forAccount.useQuery(
-    { accountId, limit: 1000 },
-    { enabled: accountId !== "" },
+  const [facets, setFacets] = useState<TxnFacets>(EMPTY_FACETS);
+  const [offset, setOffset] = useState(0);
+
+  const register = trpc.transactions.page.useQuery(
+    {
+      accountId,
+      category: facets.category,
+      query: facets.query,
+      direction: facets.direction,
+      from: facets.from,
+      to: facets.to,
+      limit: PAGE_SIZE,
+      offset,
+    },
+    { enabled: accountId !== "", placeholderData: keepPreviousData },
   );
 
   const utils = trpc.useUtils();
-  const invalidateRegister = () =>
-    void utils.transactions.forAccount.invalidate();
+  const invalidateRegister = () => void utils.transactions.page.invalidate();
+
+  const rows = useMemo(() => register.data?.rows ?? [], [register.data]);
+  const total = register.data?.total ?? 0;
+  const uncategorized = register.data?.uncategorized ?? 0;
+
+  // Reset paging whenever the filter set or account changes — the old offset
+  // is meaningless against a different result set.
+  useEffect(() => {
+    setOffset(0);
+  }, [accountId, facets]);
 
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [splitTarget, setSplitTarget] = useState<SplitTarget | null>(null);
@@ -48,17 +79,6 @@ export function TransactionsWorkspace() {
       setSavingKey(null);
     },
   });
-
-  const [facets, setFacets] = useState<TxnFacets>(EMPTY_FACETS);
-  const rows = useMemo(() => register.data ?? [], [register.data]);
-  const filtered = useMemo(
-    () => filterTransactions(rows, facets),
-    [rows, facets],
-  );
-  const uncategorized = useMemo(
-    () => rows.filter((r) => !r.categoryId).length,
-    [rows],
-  );
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkCategory, setBulkCategory] = useState<string | null>(null);
@@ -70,11 +90,11 @@ export function TransactionsWorkspace() {
     },
   });
 
-  // Clearing/changing the visible set drops any now-hidden selections.
-  const visibleKeys = useMemo(
-    () => new Set(filtered.map((t) => `${t.sourceSchema}:${t.sourceTxnId}`)),
-    [filtered],
-  );
+  const keyOf = (t: { sourceSchema: string; sourceTxnId: string }) =>
+    `${t.sourceSchema}:${t.sourceTxnId}`;
+
+  // Selection is scoped to the visible page; drop any keys no longer on it.
+  const visibleKeys = useMemo(() => new Set(rows.map(keyOf)), [rows]);
   const selectedVisible = useMemo(
     () => [...selected].filter((k) => visibleKeys.has(k)),
     [selected, visibleKeys],
@@ -92,8 +112,8 @@ export function TransactionsWorkspace() {
   function applyBulk() {
     if (!bulkCategory) return;
     const chosen = new Set(selectedVisible);
-    const txns = filtered
-      .filter((t) => chosen.has(`${t.sourceSchema}:${t.sourceTxnId}`))
+    const txns = rows
+      .filter((t) => chosen.has(keyOf(t)))
       .map((t) => ({
         sourceSchema: t.sourceSchema,
         sourceTxnId: t.sourceTxnId,
@@ -104,8 +124,12 @@ export function TransactionsWorkspace() {
   }
 
   const pickerCats = categories.data ?? [];
-
   const uncategorizedActive = facets.category === "uncategorized";
+
+  const pageStart = total === 0 ? 0 : offset + 1;
+  const pageEnd = offset + rows.length;
+  const hasPrev = offset > 0;
+  const hasNext = offset + PAGE_SIZE < total;
 
   return (
     <main className="px-8 py-6">
@@ -115,7 +139,8 @@ export function TransactionsWorkspace() {
             Transactions
           </h1>
           <p className="text-sm text-fg-muted">
-            Categorize the ledger · {filtered.length} shown
+            Categorize the ledger · {total} match
+            {total === 1 ? "" : "es"}
             {uncategorized > 0 && (
               <>
                 {" · "}
@@ -176,9 +201,7 @@ export function TransactionsWorkspace() {
             disabled={!bulkCategory || bulk.isPending}
             className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground outline-none transition-colors hover:bg-accent-bright disabled:opacity-40"
           >
-            {bulk.isPending
-              ? "Applying…"
-              : `Apply to ${selectedVisible.length}`}
+            {bulk.isPending ? "Applying…" : `Apply to ${selectedVisible.length}`}
           </button>
           <button
             type="button"
@@ -194,17 +217,17 @@ export function TransactionsWorkspace() {
         <TxnFilterBar
           facets={facets}
           onChange={setFacets}
-          showing={filtered.length}
-          total={rows.length}
+          showing={rows.length}
+          total={total}
         />
         {register.isLoading ? (
           <p className="p-4 text-sm text-fg-muted">Loading transactions…</p>
         ) : register.isError ? (
           <p className="p-4 text-sm text-danger">Failed to load transactions.</p>
         ) : rows.length === 0 ? (
-          <p className="p-4 text-sm text-fg-muted">No transactions for this account.</p>
-        ) : filtered.length === 0 ? (
-          <p className="p-4 text-sm text-fg-muted">No transactions match these filters.</p>
+          <p className="p-4 text-sm text-fg-muted">
+            No transactions match these filters.
+          </p>
         ) : (
           <table className="w-full text-sm">
             <thead>
@@ -212,19 +235,16 @@ export function TransactionsWorkspace() {
                 <th className="w-8 px-3 py-2">
                   <input
                     type="checkbox"
-                    aria-label="Select all"
+                    aria-label="Select all on page"
+                    title="Select all on this page"
                     checked={
-                      filtered.length > 0 &&
-                      selectedVisible.length === filtered.length
+                      rows.length > 0 &&
+                      selectedVisible.length === rows.length
                     }
                     onChange={(e) =>
                       setSelected(
                         e.target.checked
-                          ? new Set(
-                              filtered.map(
-                                (r) => `${r.sourceSchema}:${r.sourceTxnId}`,
-                              ),
-                            )
+                          ? new Set(rows.map(keyOf))
                           : new Set(),
                       )
                     }
@@ -237,8 +257,8 @@ export function TransactionsWorkspace() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((t) => {
-                const key = `${t.sourceSchema}:${t.sourceTxnId}`;
+              {rows.map((t) => {
+                const key = keyOf(t);
                 const negative = t.amount.startsWith("-");
                 const saving = savingKey === key && categorize.isPending;
                 return (
@@ -304,6 +324,32 @@ export function TransactionsWorkspace() {
               })}
             </tbody>
           </table>
+        )}
+        {total > 0 && (
+          <div className="flex items-center justify-between gap-3 border-t border-border p-3 text-xs text-fg-subtle">
+            <span>
+              {pageStart}–{pageEnd} of {total}
+              {register.isFetching && " · updating…"}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setOffset((o) => Math.max(o - PAGE_SIZE, 0))}
+                disabled={!hasPrev}
+                className="rounded-md border border-border px-2 py-1 outline-none hover:text-fg disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={() => setOffset((o) => o + PAGE_SIZE)}
+                disabled={!hasNext}
+                className="rounded-md border border-border px-2 py-1 outline-none hover:text-fg disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </div>
         )}
       </div>
       {categorize.isError && (

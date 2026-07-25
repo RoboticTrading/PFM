@@ -44,7 +44,7 @@ export function SplitDialog({
   const utils = trpc.useUtils();
   const split = trpc.categories.splitTransaction.useMutation({
     onSuccess: () => {
-      void utils.transactions.forAccount.invalidate();
+      void utils.transactions.invalidate();
       onClose();
     },
   });
