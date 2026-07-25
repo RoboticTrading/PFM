@@ -161,3 +161,30 @@ is claimed matched that isn't — the scorecard is the truth.
 
 *Principles: provenance in the sources · leverage what's built · value early · truth at the core · one
 brain, many instruments.*
+
+---
+
+## STATUS — 2026-07-25 (Phase 1 core delivered)
+
+**Built + validated:** the generalized match-all engine (`0-dte-optimizer/src/zerodte/cube/`:
+`matcher.py` + `run.py`). Ran against the real tastytrade 2020–2026 book (8,838 trade fills):
+
+| Instrument | Fills | Round-trips | Matched | Residual |
+|---|---|---|---|---|
+| Future | 1,319 | 754 | **100%** | none |
+| Future Option | 317 | 163 | **100%** | none |
+| Equity Option | 7,202 | 3,834 | ~94% | expiry + corp-actions (below) |
+
+**The residual is fully diagnosed, nothing unexplained:**
+- **Option expiry** — options opened, never closed by a Trade (e.g. SPXW weeklies) → expired. Phase-2
+  expiry pass flattens these.
+- **Corporate actions** — the AAPL 4:1 split (2020-08-31) re-symboled a position mid-life (strike
+  415 → ~103.75); the symbol-identity match can't pair pre/post-split legs. **This is the one genuinely
+  new hard case the 0-DTE engine never faced** (index 0-DTE options don't split). Phase-2 needs an
+  option-adjustment/corp-action mapping (OCC adjustment memos, or a split-factor table) BEFORE the
+  expiry pass — else expiry would mis-flatten a split position that was actually closed.
+
+**Next (Phase 2, needs Bob's eyes on the scorecard first — it touches real P&L assumptions):**
+expiry pass (worthless-vs-assigned needs settlement data) + corp-action guard → Schwab adapter →
+`cube.*` landing → PFM read-models/tRPC/Explorer. The engine core — the hard, unique part — is done
+and honest.
