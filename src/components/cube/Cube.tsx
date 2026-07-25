@@ -2,12 +2,21 @@
 
 import { useMemo, useState } from "react";
 
+import { CategoryTree } from "@/components/cube/CategoryTree";
 import { EquityCurve } from "@/components/cube/EquityCurve";
+import { StrategyHud } from "@/components/cube/StrategyHud";
 import { formatUsd } from "@/lib/money";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 
 type Dimension = "underlying" | "instrumentType" | "direction" | "source";
+type View = "slice" | "strategies" | "categories";
+
+const VIEWS: { key: View; label: string }[] = [
+  { key: "slice", label: "Slice" },
+  { key: "strategies", label: "Strategies" },
+  { key: "categories", label: "Categories" },
+];
 
 const DIMENSIONS: { key: Dimension; label: string }[] = [
   { key: "underlying", label: "Underlying" },
@@ -26,6 +35,7 @@ function pnlClass(v: number) {
  * beneath. Truth at the core — the Match Health chip shows what's matched vs unmatched.
  */
 export function Cube() {
+  const [view, setView] = useState<View>("slice");
   const [dimension, setDimension] = useState<Dimension>("underlying");
   const [drill, setDrill] = useState<string | null>(null); // clicked underlying → filter
 
@@ -41,6 +51,7 @@ export function Cube() {
   const holdings = trpc.cube.holdings.useQuery();
   const cashFlow = trpc.cube.cashFlow.useQuery();
   const equity = trpc.cube.equityCurve.useQuery(filter);
+  const categoryTree = trpc.cube.categoryTree.useQuery(undefined, { enabled: view === "categories" });
 
   const maxAbs = useMemo(() => {
     const rows = perf.data ?? [];
@@ -94,8 +105,44 @@ export function Cube() {
         )}
       </div>
 
+      {/* view switcher — slice / strategies / categories */}
+      <div className="mt-6 flex items-center gap-1 border-b border-border">
+        {VIEWS.map((v) => (
+          <button
+            key={v.key}
+            onClick={() => setView(v.key)}
+            className={cn(
+              "-mb-px border-b-2 px-4 py-2 text-sm transition-colors",
+              view === v.key
+                ? "border-accent font-medium text-accent"
+                : "border-transparent text-fg-muted hover:text-fg",
+            )}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
+
+      {view === "strategies" && (
+        <div className="mt-4">
+          <StrategyHud />
+        </div>
+      )}
+
+      {view === "categories" && (
+        <div className="mt-4">
+          {categoryTree.data ? (
+            <CategoryTree rows={categoryTree.data} />
+          ) : (
+            <div className="h-40 rounded-md border border-border bg-card" />
+          )}
+        </div>
+      )}
+
+      {view === "slice" && (
+        <>
       {/* dimension slicer */}
-      <div className="mt-6 flex items-center gap-2">
+      <div className="mt-4 flex items-center gap-2">
         <span className="text-[10px] font-medium uppercase tracking-wide text-fg-subtle">Slice by</span>
         {DIMENSIONS.map((d) => (
           <button
@@ -268,6 +315,8 @@ export function Cube() {
           )}
         </section>
       </div>
+        </>
+      )}
     </main>
   );
 }

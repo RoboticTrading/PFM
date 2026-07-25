@@ -31,6 +31,35 @@ export const cubeTrades = cube.table("trades", {
   builtAt: timestamp("built_at", { withTimezone: true }),
 });
 
+/**
+ * One traded STRUCTURE — a strategy row (Bob's Excel HUD): legs grouped by their open order into a
+ * Bull Put Spread / Bear Call Spread / Iron Condor / Short Future, with the power columns (capital,
+ * max_loss, %RoC, %RoR). Built by 0-dte-optimizer/src/zerodte/cube/structures.py.
+ */
+export const cubeStructures = cube.table("structures", {
+  structureId: bigint("structure_id", { mode: "number" }),
+  source: text("source"),
+  account: text("account"),
+  underlying: text("underlying"),
+  strategy: text("strategy"),
+  category: text("category"), // tree path: Income / Trading / Options / Bull Put Spread
+  openedAt: timestamp("opened_at", { withTimezone: true }),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+  heldDays: integer("held_days"),
+  legs: integer("legs"),
+  qty: integer("qty"),
+  openCash: numeric("open_cash"),
+  closeCash: numeric("close_cash"),
+  realizedPnl: numeric("realized_pnl"),
+  width: numeric("width"),
+  capital: numeric("capital"),
+  maxLoss: numeric("max_loss"),
+  roc: numeric("roc"), // realized_pnl / capital
+  ror: numeric("ror"), // realized_pnl / max_loss
+  status: text("status"), // closed | expired
+  orderId: text("order_id"),
+});
+
 /** Scorecard per batch run — the match-health / trust signal. */
 export const cubeMatchRuns = cube.table("match_runs", {
   runId: bigint("run_id", { mode: "number" }),
@@ -63,6 +92,7 @@ export const cubeCashFlows = cube.table("cash_flows", {
   account: text("account"),
   flowDate: date("flow_date"),
   category: text("category"),
+  rollup: text("rollup"), // income | expense | transfer | settlement (the category-tree bucket)
   amount: numeric("amount"),
   description: text("description"),
 });

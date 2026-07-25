@@ -6,6 +6,7 @@ import {
   cubeCashFlows,
   cubeHoldings,
   cubeMatchRuns,
+  cubeStructures,
   cubeTrades,
 } from "@/lib/db/read-models/cube";
 
@@ -219,6 +220,134 @@ export async function cubeCashFlowByCategory(): Promise<CashFlowRow[]> {
     .from(cubeCashFlows)
     .groupBy(cubeCashFlows.category)
     .orderBy(desc(sql`abs(sum(${cubeCashFlows.amount}))`));
+}
+
+// ─── Structures: the strategy HUD + power columns (Bob's Excel, live) ──────────────────
+
+function structWhere(f: CubeFilter) {
+  const parts = [];
+  if (f.underlying) parts.push(eq(cubeStructures.underlying, f.underlying));
+  if (f.from) parts.push(gte(sql`${cubeStructures.openedAt}::date`, f.from));
+  if (f.to) parts.push(lte(sql`${cubeStructures.openedAt}::date`, f.to));
+  return parts.length ? and(...parts) : undefined;
+}
+
+export interface StrategyRow {
+  strategy: string;
+  n: number;
+  realizedPnl: string;
+  wins: number;
+  winRate: number;
+  avgRoc: string | null; // % return on capital
+  avgRor: string | null; // % return on risk
+  capital: string | null; // total capital deployed (defined-risk structures)
+  avgHeldDays: string | null;
+}
+
+/** P&L + the power columns grouped by strategy — the strategy scorecard. */
+export async function cubeStrategyPerformance(filter: CubeFilter = {}): Promise<StrategyRow[]> {
+  const rows = await getDb()
+    .select({
+      strategy: sql<string>`coalesce(${cubeStructures.strategy},'—')`,
+      n: sql<number>`count(*)::int`,
+      realizedPnl: sql<string>`round(coalesce(sum(${cubeStructures.realizedPnl}),0)::numeric,2)::text`,
+      wins: sql<number>`count(*) filter (where ${cubeStructures.realizedPnl} > 0)::int`,
+      avgRoc: sql<string | null>`round(avg(${cubeStructures.roc})*100,1)::text`,
+      avgRor: sql<string | null>`round(avg(${cubeStructures.ror})*100,1)::text`,
+      capital: sql<string | null>`round(sum(${cubeStructures.capital})::numeric,0)::text`,
+      avgHeldDays: sql<string | null>`round(avg(${cubeStructures.heldDays}),1)::text`,
+    })
+    .from(cubeStructures)
+    .where(structWhere(filter))
+    .groupBy(cubeStructures.strategy)
+    .orderBy(desc(sql`count(*)`));
+  return rows.map((r) => ({ ...r, winRate: r.n ? r.wins / r.n : 0 }));
+}
+
+export interface StructureRow {
+  structureId: number;
+  source: string;
+  underlying: string;
+  strategy: string;
+  legs: number;
+  qty: number;
+  openedAt: string;
+  closedAt: string | null;
+  heldDays: number | null;
+  realizedPnl: string;
+  capital: string | null;
+  maxLoss: string | null;
+  roc: string | null; // % (already ×100)
+  ror: string | null;
+  status: string;
+}
+
+/** The strategy register — one row per structure, newest first (the sortable HUD). */
+export async function cubeStructuresList(filter: CubeFilter = {}): Promise<StructureRow[]> {
+  const parts = [structWhere(filter)];
+  if (filter.instrumentType) parts.push(eq(cubeStructures.strategy, filter.instrumentType));
+  return getDb()
+    .select({
+      structureId: cubeStructures.structureId,
+      source: sql<string>`coalesce(${cubeStructures.source},'—')`,
+      underlying: sql<string>`coalesce(${cubeStructures.underlying},'—')`,
+      strategy: sql<string>`coalesce(${cubeStructures.strategy},'—')`,
+      legs: sql<number>`coalesce(${cubeStructures.legs},0)::int`,
+      qty: sql<number>`coalesce(${cubeStructures.qty},0)::int`,
+      openedAt: sql<string>`${cubeStructures.openedAt}::text`,
+      closedAt: sql<string | null>`${cubeStructures.closedAt}::text`,
+      heldDays: cubeStructures.heldDays,
+      realizedPnl: sql<string>`round(${cubeStructures.realizedPnl}::numeric,2)::text`,
+      capital: sql<string | null>`round(${cubeStructures.capital}::numeric,0)::text`,
+      maxLoss: sql<string | null>`round(${cubeStructures.maxLoss}::numeric,0)::text`,
+      roc: sql<string | null>`round(${cubeStructures.roc}*100,1)::text`,
+      ror: sql<string | null>`round(${cubeStructures.ror}*100,1)::text`,
+      status: sql<string>`coalesce(${cubeStructures.status},'closed')`,
+    })
+    .from(cubeStructures)
+    .where(and(...parts.filter(Boolean)))
+    .orderBy(desc(cubeStructures.openedAt))
+    .limit(Math.min(filter.limit ?? 300, 1000)) as Promise<StructureRow[]>;
+}
+
+export interface CategoryNode {
+  path: string; // " / "-delimited, e.g. "Income / Trading / Options / Bull Put Spread"
+  amount: string;
+  n: number;
+}
+
+/**
+ * The category tree — every Cube fact bucketed into Income / Expenses / Transfers, per Bob's ask.
+ * Trading structures roll up under their strategy path; broker cash flows join under Income/Expenses
+ * by their rollup. Settlement (futures mark-to-market) is excluded — it's the cash side of futures
+ * trade P&L, already counted in Trading. Returns flat rows; the client assembles the tree.
+ */
+export async function cubeCategoryTree(): Promise<CategoryNode[]> {
+  const db = getDb();
+  const [trading, flows] = await Promise.all([
+    db
+      .select({
+        path: sql<string>`coalesce(${cubeStructures.category},'Income / Trading / Other')`,
+        amount: sql<string>`round(sum(${cubeStructures.realizedPnl})::numeric,2)::text`,
+        n: sql<number>`count(*)::int`,
+      })
+      .from(cubeStructures)
+      .groupBy(cubeStructures.category),
+    db
+      .select({
+        path: sql<string>`case ${cubeCashFlows.rollup}
+            when 'income'  then 'Income / Broker / '   || initcap(coalesce(${cubeCashFlows.category},'other'))
+            when 'expense' then 'Expenses / Broker / ' || initcap(coalesce(${cubeCashFlows.category},'other'))
+            when 'transfer' then 'Transfers / '        || initcap(coalesce(${cubeCashFlows.category},'other'))
+          end`,
+        amount: sql<string>`round(sum(${cubeCashFlows.amount})::numeric,2)::text`,
+        n: sql<number>`count(*)::int`,
+      })
+      .from(cubeCashFlows)
+      .where(sql`${cubeCashFlows.rollup} in ('income','expense','transfer')`)
+      .groupBy(cubeCashFlows.rollup, cubeCashFlows.category),
+  ]);
+  return [...trading, ...flows].filter((r) => r.path) as CategoryNode[];
 }
 
 export interface EquityPoint {

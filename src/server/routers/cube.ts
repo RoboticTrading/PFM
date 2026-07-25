@@ -2,10 +2,13 @@ import { z } from "zod";
 
 import {
   cubeCashFlowByCategory,
+  cubeCategoryTree,
   cubeEquityCurve,
   cubeHoldingsList,
   cubeMatchHealth,
   cubePerformance,
+  cubeStrategyPerformance,
+  cubeStructuresList,
   cubeSummary,
   cubeTradesList,
 } from "@/lib/cube/cube";
@@ -35,6 +38,15 @@ export const cubeRouter = router({
 
   /** The trade register — round-trips, filtered, newest first. */
   trades: publicProcedure.input(filter).query(({ input }) => cubeTradesList(input ?? {})),
+
+  /** Strategy scorecard — P&L + power columns (%RoC/%RoR/Capital) grouped by strategy. */
+  strategies: publicProcedure.input(filter).query(({ input }) => cubeStrategyPerformance(input ?? {})),
+
+  /** The structure register — one row per strategy structure (the sortable HUD). */
+  structures: publicProcedure.input(filter).query(({ input }) => cubeStructuresList(input ?? {})),
+
+  /** The category tree — every fact bucketed into Income / Expenses / Transfers. */
+  categoryTree: publicProcedure.query(() => cubeCategoryTree()),
 
   /** Match-health scorecard — the trust signal (matched vs unmatched). */
   matchHealth: publicProcedure.query(() => cubeMatchHealth()),
