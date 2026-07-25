@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { EquityCurve } from "@/components/cube/EquityCurve";
 import { formatUsd } from "@/lib/money";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,7 @@ export function Cube() {
   const health = trpc.cube.matchHealth.useQuery();
   const holdings = trpc.cube.holdings.useQuery();
   const cashFlow = trpc.cube.cashFlow.useQuery();
+  const equity = trpc.cube.equityCurve.useQuery(filter);
 
   const maxAbs = useMemo(() => {
     const rows = perf.data ?? [];
@@ -81,6 +83,15 @@ export function Cube() {
         <Stat label="Contracts" value={summary.data?.contracts.toLocaleString() ?? "—"} />
         <Stat label="Underlyings" value={summary.data?.underlyings.toLocaleString() ?? "—"} />
         <Stat label="Span" value={summary.data?.first ? `${summary.data.first} → ${summary.data.last}` : "—"} small />
+      </div>
+
+      {/* the waterfall — cumulative realized P&L */}
+      <div className="mt-4">
+        {equity.data ? (
+          <EquityCurve points={equity.data} />
+        ) : (
+          <div className="h-[210px] rounded-md border border-border bg-card" />
+        )}
       </div>
 
       {/* dimension slicer */}

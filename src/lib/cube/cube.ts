@@ -220,3 +220,27 @@ export async function cubeCashFlowByCategory(): Promise<CashFlowRow[]> {
     .groupBy(cubeCashFlows.category)
     .orderBy(desc(sql`abs(sum(${cubeCashFlows.amount}))`));
 }
+
+export interface EquityPoint {
+  date: string;
+  daily: string;
+  cum: number;
+}
+
+/** Cumulative realized-P&L curve over time (by close date) — the waterfall/equity curve. */
+export async function cubeEquityCurve(filter: CubeFilter = {}): Promise<EquityPoint[]> {
+  const rows = await getDb()
+    .select({
+      date: sql<string>`coalesce(${cubeTrades.closedAt}, ${cubeTrades.openedAt})::date::text`,
+      daily: sql<string>`round(sum(${cubeTrades.realizedPnl})::numeric,2)::text`,
+    })
+    .from(cubeTrades)
+    .where(whereClause(filter))
+    .groupBy(sql`coalesce(${cubeTrades.closedAt}, ${cubeTrades.openedAt})::date`)
+    .orderBy(sql`coalesce(${cubeTrades.closedAt}, ${cubeTrades.openedAt})::date`);
+  let cum = 0;
+  return rows.map((r) => {
+    cum += Number(r.daily);
+    return { date: r.date, daily: r.daily, cum: Math.round(cum) };
+  });
+}
