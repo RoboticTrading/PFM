@@ -50,6 +50,13 @@
       "when": 1784721857951,
       "tag": "0006_large_maverick",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785006099354,
+      "tag": "0007_lean_bucky",
+      "breakpoints": true
     }
   ]
 }

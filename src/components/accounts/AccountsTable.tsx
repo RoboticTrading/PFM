@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { trpc } from "@/lib/trpc/client";
 
-import { BalanceCell } from "./BalanceCell";
+import { BalanceEditCell } from "./BalanceEditCell";
 import { KindBadge } from "./KindBadge";
 
 /** The Accounts Explorer register — dense, keyboard-navigable, drill-in rows. */
@@ -63,7 +63,16 @@ export function AccountsTable() {
               {a.sourceLabel}
             </TableCell>
             <TableCell className="text-right">
-              <BalanceCell accountId={a.id} />
+              <BalanceEditCell
+                account={{
+                  id: a.id,
+                  name: a.name,
+                  kind: a.kind,
+                  balance: a.balance,
+                  asOfDate: a.asOfDate,
+                  isLiability: a.isLiability,
+                }}
+              />
             </TableCell>
           </TableRow>
         ))}

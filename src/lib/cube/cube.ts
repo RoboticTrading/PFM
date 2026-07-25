@@ -1,9 +1,9 @@
 import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
+import { accountBalance } from "@/lib/db/read-models/account-balance";
 import {
   type CubeDimension,
-  cubeAccountSnapshot,
   cubeCashFlows,
   cubeHoldings,
   cubeEtfDaily,
@@ -529,8 +529,8 @@ function magnitude(value: string): string {
  * The net-worth roll-up — Bob's whole balance sheet in one shot. Assets (house + ETF sleeve
  * market value + car + checking) minus liabilities (brokerage margin debit + credit cards).
  * The ETF sleeve and the margin both live in the Schwab brokerage account: the holdings are the
- * asset, the margin balance is the liability. Point-in-time balances come from cube.account_snapshot
- * (Bob-seeded); marked assets come from the live cube facts.
+ * asset, the margin balance is the liability. Point-in-time balances come from the owner-editable
+ * financialmanager.account_balance table; marked assets come from the live cube facts.
  */
 export async function cubeNetWorth(): Promise<NetWorth> {
   const db = getDb();
@@ -555,12 +555,12 @@ export async function cubeNetWorth(): Promise<NetWorth> {
       .limit(1),
     db
       .select({
-        account: cubeAccountSnapshot.account,
-        balance: sql<string>`round(${cubeAccountSnapshot.balance}::numeric,2)::text`,
-        isLiability: cubeAccountSnapshot.isLiability,
+        account: accountBalance.name,
+        balance: sql<string>`round(${accountBalance.balance}::numeric,2)::text`,
+        isLiability: accountBalance.isLiability,
       })
-      .from(cubeAccountSnapshot)
-      .orderBy(desc(sql`abs(${cubeAccountSnapshot.balance})`)),
+      .from(accountBalance)
+      .orderBy(desc(sql`abs(${accountBalance.balance})`)),
   ]);
 
   const house = houseRow[0]?.value ?? "0";
@@ -621,18 +621,18 @@ export interface Liquidity {
 /**
  * The liquidity read — what Bob can actually spend right now (checking cash) against what he owes
  * on revolving credit (the cards + the brokerage margin debit). Net worth hides the cash squeeze
- * behind illiquid house/ETF equity; this surfaces it. All from the Bob-seeded account snapshots.
+ * behind illiquid house/ETF equity; this surfaces it. All from the owner-editable account balances.
  */
 export async function cubeLiquidity(): Promise<Liquidity> {
   const rows = await getDb()
     .select({
-      account: sql<string>`coalesce(${cubeAccountSnapshot.account}, '—')`,
-      kind: sql<string>`coalesce(${cubeAccountSnapshot.kind}, '—')`,
-      balance: sql<string>`round(${cubeAccountSnapshot.balance}::numeric, 2)::text`,
-      isLiability: cubeAccountSnapshot.isLiability,
-      asOf: sql<string | null>`${cubeAccountSnapshot.asOf}::text`,
+      account: sql<string>`coalesce(${accountBalance.name}, '—')`,
+      kind: sql<string>`coalesce(${accountBalance.kind}, '—')`,
+      balance: sql<string>`round(${accountBalance.balance}::numeric, 2)::text`,
+      isLiability: accountBalance.isLiability,
+      asOf: sql<string | null>`${accountBalance.asOfDate}::text`,
     })
-    .from(cubeAccountSnapshot);
+    .from(accountBalance);
 
   const cashRows = rows.filter((r) => !r.isLiability);
   const cardRows = rows.filter((r) => r.isLiability && r.kind === "credit-card");

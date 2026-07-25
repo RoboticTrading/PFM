@@ -2,8 +2,15 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 // Mock the typed tRPC client so the register renders from fixtures (no network).
+const noopInvalidate = { invalidate: () => Promise.resolve() };
 vi.mock("@/lib/trpc/client", () => ({
   trpc: {
+    useUtils: () => ({
+      accounts: { list: noopInvalidate, byId: noopInvalidate },
+      balances: { forAccount: noopInvalidate },
+      cube: { netWorth: noopInvalidate, liquidity: noopInvalidate },
+      reports: noopInvalidate,
+    }),
     accounts: {
       list: {
         useQuery: () => ({
@@ -23,6 +30,14 @@ vi.mock("@/lib/trpc/client", () => ({
               isLiability: false,
             },
           ],
+        }),
+      },
+      setBalance: {
+        useMutation: () => ({
+          mutate: () => {},
+          reset: () => {},
+          isPending: false,
+          isError: false,
         }),
       },
     },

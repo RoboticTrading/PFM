@@ -3,6 +3,7 @@ export * from "./columns";
 export * from "./audit-log";
 export * from "./institution";
 export * from "./account";
+export * from "./account-balance";
 export * from "./balance-forward";
 export * from "./category";
 export * from "./transaction-category";

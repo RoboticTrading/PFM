@@ -2,10 +2,10 @@ import { asc, desc, eq } from "drizzle-orm";
 
 import { getDb } from "../index";
 import {
-  cubeAccount,
-  cubeAccountSnapshot,
-  cubeVLedger,
-} from "./cube";
+  type AccountBalanceSnapshot,
+  listAccountBalanceSnapshots,
+} from "./account-balance";
+import { cubeAccount, cubeVLedger } from "./cube";
 import type { CanonicalTxn } from "./transactions";
 
 /**
@@ -118,19 +118,20 @@ export interface LedgerAccount {
   institutionKind: string;
   /** Human-readable source label (the cube account key). */
   sourceLabel: string;
-  /** Current balance from `cube.account_snapshot` (signed), or "0.0000". */
+  /** Current balance from `financialmanager.account_balance` (signed), or "0.0000". */
   balance: string;
-  /** The snapshot's `as_of` date, or null if no snapshot. */
+  /** The balance's `as_of` date, or null if none. */
   asOfDate: string | null;
   /** True when this balance is money owed (credit-card / margin). */
   isLiability: boolean;
 }
 
-type SnapshotRow = typeof cubeAccountSnapshot.$inferSelect;
+type SnapshotRow = AccountBalanceSnapshot;
 
 /**
- * Match a cube account to its snapshot on the stable `account_key` (normalized onto
- * `cube.account_snapshot`), with a kind/name fallback for any snapshot not yet keyed.
+ * Match a cube account to its owner-editable balance on the stable `account_key`
+ * (`financialmanager.account_balance`), with a kind/name fallback for any balance
+ * not yet keyed.
  */
 function matchSnapshot(
   account: { accountKey: string; name: string; kind: string },
@@ -172,7 +173,7 @@ export async function listLedgerAccounts(): Promise<LedgerAccount[]> {
   const db = getDb();
   const [accounts, snapshots] = await Promise.all([
     db.select().from(cubeAccount).orderBy(asc(cubeAccount.name)),
-    db.select().from(cubeAccountSnapshot),
+    listAccountBalanceSnapshots(),
   ]);
   return accounts.map((a) => enrich(a, snapshots));
 }
@@ -184,15 +185,16 @@ export async function getLedgerAccount(
   const db = getDb();
   const [[account], snapshots] = await Promise.all([
     db.select().from(cubeAccount).where(eq(cubeAccount.accountKey, accountKey)).limit(1),
-    db.select().from(cubeAccountSnapshot),
+    listAccountBalanceSnapshots(),
   ]);
   return account ? enrich(account, snapshots) : null;
 }
 
 /**
- * Current balance for an account, sourced from `cube.account_snapshot`. Kept in the
- * legacy `{ forward, since, balance }` shape so the balance UI renders unchanged —
- * the snapshot is the authoritative current balance (`forward`), with `since` = 0.
+ * Current balance for an account, sourced from `financialmanager.account_balance`.
+ * Kept in the legacy `{ forward, since, balance }` shape so the balance UI renders
+ * unchanged — the stored balance is the authoritative current balance (`forward`),
+ * with `since` = 0.
  */
 export interface LedgerBalance {
   accountId: string;
