@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { CategoryTree } from "@/components/cube/CategoryTree";
 import { EquityCurve } from "@/components/cube/EquityCurve";
+import { GainLossChart } from "@/components/cube/GainLossChart";
 import { StrategyHud } from "@/components/cube/StrategyHud";
 import { formatUsd } from "@/lib/money";
 import { trpc } from "@/lib/trpc/client";
@@ -38,6 +39,7 @@ export function Cube() {
   const [view, setView] = useState<View>("slice");
   const [dimension, setDimension] = useState<Dimension>("underlying");
   const [drill, setDrill] = useState<string | null>(null); // clicked underlying → filter
+  const [etfChart, setEtfChart] = useState<string | null>(null); // clicked ETF → daily gain/loss chart
 
   const filter = useMemo(
     () => (drill && dimension === "underlying" ? { underlying: drill } : {}),
@@ -50,6 +52,10 @@ export function Cube() {
   const health = trpc.cube.matchHealth.useQuery();
   const holdings = trpc.cube.holdings.useQuery();
   const openPositions = trpc.cube.openPositions.useQuery();
+  const etfDaily = trpc.cube.etfDaily.useQuery(
+    { symbol: etfChart ?? "" },
+    { enabled: etfChart != null },
+  );
   const cashFlow = trpc.cube.cashFlow.useQuery();
   const equity = trpc.cube.equityCurve.useQuery(filter);
   const categoryTree = trpc.cube.categoryTree.useQuery(undefined, { enabled: view === "categories" });
@@ -263,7 +269,7 @@ export function Cube() {
         <section className="rounded-md border border-border bg-card">
           <div className="flex items-center justify-between border-b border-border px-4 py-2">
             <span className="text-[10px] font-medium uppercase tracking-wide text-fg-subtle">
-              Holdings · covered-call ETF sleeve · marked-to-market
+              Holdings · covered-call ETF sleeve · marked-to-market · click for gain/loss chart
             </span>
             {holdings.data?.[0]?.markAt && (
               <span className="text-[10px] text-fg-subtle">mark @ {holdings.data[0].markAt}</span>
@@ -288,7 +294,14 @@ export function Cube() {
                   const unreal = h.unrealizedPnl == null ? null : Number(h.unrealizedPnl);
                   const tot = h.totalReturn == null ? null : Number(h.totalReturn);
                   return (
-                    <tr key={h.symbol} className="border-b border-border-light/40">
+                    <tr
+                      key={h.symbol}
+                      onClick={() => setEtfChart(etfChart === h.symbol ? null : h.symbol)}
+                      className={cn(
+                        "cursor-pointer border-b border-border-light/40 hover:bg-muted/50",
+                        etfChart === h.symbol && "bg-accent/10",
+                      )}
+                    >
                       <td className="px-4 py-1.5 font-medium text-fg">{h.symbol}</td>
                       <td className="py-1.5 text-right text-xs text-fg-muted tabular-nums">
                         {Number(h.shares).toLocaleString()}
@@ -344,6 +357,17 @@ export function Cube() {
           )}
         </section>
       </div>
+
+      {/* per-ETF daily gain/loss chart — Bob's spreadsheet, live (click a holding above) */}
+      {etfChart && (
+        <div className="mt-4">
+          {etfDaily.data ? (
+            <GainLossChart symbol={etfChart} points={etfDaily.data} />
+          ) : (
+            <div className="h-[286px] rounded-md border border-border bg-card" />
+          )}
+        </div>
+      )}
 
       {/* open futures / equity positions — marked to market (or flat) */}
       <section className="mt-4 rounded-md border border-border bg-card">

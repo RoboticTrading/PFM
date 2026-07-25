@@ -5,6 +5,7 @@ import {
   type CubeDimension,
   cubeCashFlows,
   cubeHoldings,
+  cubeEtfDaily,
   cubeMatchRuns,
   cubeOpenPositions,
   cubeStructures,
@@ -361,6 +362,32 @@ export async function cubeCategoryTree(): Promise<CategoryNode[]> {
       .groupBy(cubeCashFlows.rollup, cubeCashFlows.category),
   ]);
   return [...trading, ...flows].filter((r) => r.path) as CategoryNode[];
+}
+
+export interface EtfDailyPoint {
+  d: string;
+  gain: number; // $ gain/loss (value − net cost)
+  gainPct: number; // % gain/loss
+  marketValue: number;
+  netCost: number;
+  close: number;
+}
+
+/** Bob's ETF sheet reproduced — the daily $ and % gain/loss series for one ETF (its two curves). */
+export async function cubeEtfDailySeries(symbol: string): Promise<EtfDailyPoint[]> {
+  const rows = await getDb()
+    .select({
+      d: sql<string>`${cubeEtfDaily.d}::text`,
+      gain: sql<number>`${cubeEtfDaily.gain}::float8`,
+      gainPct: sql<number>`coalesce(${cubeEtfDaily.gainPct},0)::float8`,
+      marketValue: sql<number>`${cubeEtfDaily.marketValue}::float8`,
+      netCost: sql<number>`${cubeEtfDaily.netCost}::float8`,
+      close: sql<number>`${cubeEtfDaily.close}::float8`,
+    })
+    .from(cubeEtfDaily)
+    .where(eq(cubeEtfDaily.symbol, symbol))
+    .orderBy(cubeEtfDaily.d);
+  return rows as EtfDailyPoint[];
 }
 
 export interface OpenPositionRow {

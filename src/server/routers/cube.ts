@@ -4,6 +4,7 @@ import {
   cubeCashFlowByCategory,
   cubeCategoryTree,
   cubeEquityCurve,
+  cubeEtfDailySeries,
   cubeHoldingsList,
   cubeMatchHealth,
   cubeOpenPositionsList,
@@ -60,6 +61,11 @@ export const cubeRouter = router({
 
   /** Live open futures/equity positions, marked to market (empty when flat). */
   openPositions: publicProcedure.query(() => cubeOpenPositionsList()),
+
+  /** One ETF's daily $ + % gain/loss series (Bob's spreadsheet charts, live). */
+  etfDaily: publicProcedure
+    .input(z.object({ symbol: z.string() }))
+    .query(({ input }) => cubeEtfDailySeries(input.symbol)),
 
   /** Broker money movement by category — deposits, interest, fees, dividends. */
   cashFlow: publicProcedure.query(() => cubeCashFlowByCategory()),

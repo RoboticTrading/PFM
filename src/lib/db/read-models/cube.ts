@@ -91,7 +91,22 @@ export const cubeHoldings = cube.table("holdings_income", {
   totalReturnPct: numeric("total_return_pct"),
 });
 
-/** Current marks — one price per held instrument (candle-first, Yahoo fallback), for MTM. */
+/** Bob's ETF spreadsheet, live — daily mark-to-market gain/loss per held ETF (the $/% curves). */
+export const cubeEtfDaily = cube.table("etf_daily", {
+  symbol: text("symbol"),
+  d: date("d"),
+  close: numeric("close"),
+  shares: numeric("shares"),
+  grossCost: numeric("gross_cost"),
+  dividends: numeric("dividends"),
+  netCost: numeric("net_cost"),
+  costPerShare: numeric("cost_per_share"),
+  marketValue: numeric("market_value"),
+  gain: numeric("gain"),
+  gainPct: numeric("gain_pct"),
+});
+
+/** Current marks — one price per held instrument (broker-fed), for MTM. */
 export const cubeMarks = cube.table("marks", {
   symbol: text("symbol"),
   mark: numeric("mark"),
