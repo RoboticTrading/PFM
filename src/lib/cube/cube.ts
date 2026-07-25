@@ -6,6 +6,7 @@ import {
   cubeCashFlows,
   cubeHoldings,
   cubeMatchRuns,
+  cubeOpenPositions,
   cubeStructures,
   cubeTrades,
 } from "@/lib/db/read-models/cube";
@@ -181,9 +182,15 @@ export interface HoldingRow {
   netBasis: string;
   pctCapitalReturned: string;
   nDividends: number;
+  mark: string | null;
+  markAt: string | null;
+  marketValue: string | null;
+  unrealizedPnl: string | null;
+  totalReturn: string | null;
+  totalReturnPct: string | null;
 }
 
-/** The covered-call ETF sleeve — held income positions, basis vs dividends collected. */
+/** The covered-call ETF sleeve — held income positions, basis vs dividends vs current mark-to-market. */
 export async function cubeHoldingsList(): Promise<HoldingRow[]> {
   return getDb()
     .select({
@@ -194,6 +201,12 @@ export async function cubeHoldingsList(): Promise<HoldingRow[]> {
       netBasis: sql<string>`round(${cubeHoldings.netBasis}::numeric,2)::text`,
       pctCapitalReturned: sql<string>`round(${cubeHoldings.pctCapitalReturned}::numeric,1)::text`,
       nDividends: sql<number>`coalesce(${cubeHoldings.nDividends},0)::int`,
+      mark: sql<string | null>`${cubeHoldings.mark}::text`,
+      markAt: sql<string | null>`${cubeHoldings.markAt}::date::text`,
+      marketValue: sql<string | null>`round(${cubeHoldings.marketValue}::numeric,2)::text`,
+      unrealizedPnl: sql<string | null>`round(${cubeHoldings.unrealizedPnl}::numeric,2)::text`,
+      totalReturn: sql<string | null>`round(${cubeHoldings.totalReturn}::numeric,2)::text`,
+      totalReturnPct: sql<string | null>`${cubeHoldings.totalReturnPct}::text`,
     })
     .from(cubeHoldings)
     .orderBy(desc(cubeHoldings.dividendsReceived)) as Promise<HoldingRow[]>;
@@ -348,6 +361,36 @@ export async function cubeCategoryTree(): Promise<CategoryNode[]> {
       .groupBy(cubeCashFlows.rollup, cubeCashFlows.category),
   ]);
   return [...trading, ...flows].filter((r) => r.path) as CategoryNode[];
+}
+
+export interface OpenPositionRow {
+  symbol: string;
+  kind: string;
+  qty: string;
+  direction: string;
+  avgCost: string | null;
+  mark: string | null;
+  markAt: string | null;
+  marketValue: string | null;
+  unrealizedPnl: string | null;
+}
+
+/** Live open futures/equity positions, marked to market — empty when the book is flat. */
+export async function cubeOpenPositionsList(): Promise<OpenPositionRow[]> {
+  return getDb()
+    .select({
+      symbol: cubeOpenPositions.symbol,
+      kind: sql<string>`coalesce(${cubeOpenPositions.kind},'—')`,
+      qty: sql<string>`${cubeOpenPositions.qty}::text`,
+      direction: sql<string>`coalesce(${cubeOpenPositions.direction},'—')`,
+      avgCost: sql<string | null>`round(${cubeOpenPositions.avgCost}::numeric,2)::text`,
+      mark: sql<string | null>`${cubeOpenPositions.mark}::text`,
+      markAt: sql<string | null>`${cubeOpenPositions.markAt}::date::text`,
+      marketValue: sql<string | null>`round(${cubeOpenPositions.marketValue}::numeric,2)::text`,
+      unrealizedPnl: sql<string | null>`round(${cubeOpenPositions.unrealizedPnl}::numeric,2)::text`,
+    })
+    .from(cubeOpenPositions)
+    .orderBy(desc(sql`abs(coalesce(${cubeOpenPositions.unrealizedPnl},0))`)) as Promise<OpenPositionRow[]>;
 }
 
 export interface EquityPoint {

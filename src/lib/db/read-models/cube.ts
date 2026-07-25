@@ -83,6 +83,36 @@ export const cubeHoldings = cube.table("holdings_income", {
   lastDividend: date("last_dividend"),
   nBuys: integer("n_buys"),
   nDividends: integer("n_dividends"),
+  mark: numeric("mark"), // current price (cube.marks)
+  markAt: timestamp("mark_at", { withTimezone: true }),
+  marketValue: numeric("market_value"), // shares × mark
+  unrealizedPnl: numeric("unrealized_pnl"), // market_value − cost basis
+  totalReturn: numeric("total_return"), // unrealized + dividends
+  totalReturnPct: numeric("total_return_pct"),
+});
+
+/** Current marks — one price per held instrument (candle-first, Yahoo fallback), for MTM. */
+export const cubeMarks = cube.table("marks", {
+  symbol: text("symbol"),
+  mark: numeric("mark"),
+  asOf: timestamp("as_of", { withTimezone: true }),
+  source: text("source"),
+});
+
+/** Live open futures/equity positions (net-inventory, expiry-filtered), marked to market. */
+export const cubeOpenPositions = cube.table("open_positions", {
+  symbol: text("symbol"),
+  kind: text("kind"), // future | equity
+  underlying: text("underlying"),
+  qty: numeric("qty"),
+  direction: text("direction"),
+  avgCost: numeric("avg_cost"),
+  costBasis: numeric("cost_basis"),
+  mark: numeric("mark"),
+  markAt: timestamp("mark_at", { withTimezone: true }),
+  pointValue: numeric("point_value"),
+  marketValue: numeric("market_value"),
+  unrealizedPnl: numeric("unrealized_pnl"),
 });
 
 /** Broker money movement — deposits, interest, fees, dividends (the money in/out at the broker). */

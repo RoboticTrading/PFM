@@ -6,6 +6,7 @@ import {
   cubeEquityCurve,
   cubeHoldingsList,
   cubeMatchHealth,
+  cubeOpenPositionsList,
   cubePerformance,
   cubeStrategyPerformance,
   cubeStructuresList,
@@ -54,8 +55,11 @@ export const cubeRouter = router({
   /** Cumulative realized-P&L curve over time — the equity/waterfall curve. */
   equityCurve: publicProcedure.input(filter).query(({ input }) => cubeEquityCurve(input ?? {})),
 
-  /** The covered-call ETF sleeve — held income positions (basis vs dividends). */
+  /** The covered-call ETF sleeve — held income positions (basis vs dividends vs mark). */
   holdings: publicProcedure.query(() => cubeHoldingsList()),
+
+  /** Live open futures/equity positions, marked to market (empty when flat). */
+  openPositions: publicProcedure.query(() => cubeOpenPositionsList()),
 
   /** Broker money movement by category — deposits, interest, fees, dividends. */
   cashFlow: publicProcedure.query(() => cubeCashFlowByCategory()),

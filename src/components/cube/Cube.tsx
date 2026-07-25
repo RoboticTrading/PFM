@@ -49,6 +49,7 @@ export function Cube() {
   const trades = trpc.cube.trades.useQuery({ ...filter, limit: 150 });
   const health = trpc.cube.matchHealth.useQuery();
   const holdings = trpc.cube.holdings.useQuery();
+  const openPositions = trpc.cube.openPositions.useQuery();
   const cashFlow = trpc.cube.cashFlow.useQuery();
   const equity = trpc.cube.equityCurve.useQuery(filter);
   const categoryTree = trpc.cube.categoryTree.useQuery(undefined, { enabled: view === "categories" });
@@ -260,33 +261,61 @@ export function Cube() {
       {/* holdings + broker cash flow — the non-trade facts */}
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <section className="rounded-md border border-border bg-card">
-          <div className="border-b border-border px-4 py-2 text-[10px] font-medium uppercase tracking-wide text-fg-subtle">
-            Holdings & Income · covered-call ETF sleeve
+          <div className="flex items-center justify-between border-b border-border px-4 py-2">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-fg-subtle">
+              Holdings · covered-call ETF sleeve · marked-to-market
+            </span>
+            {holdings.data?.[0]?.markAt && (
+              <span className="text-[10px] text-fg-subtle">mark @ {holdings.data[0].markAt}</span>
+            )}
           </div>
-          <table className="w-full text-sm">
-            <thead className="text-[10px] uppercase tracking-wide text-fg-subtle">
-              <tr className="border-b border-border-light/50">
-                <th className="px-4 py-1.5 text-left font-medium">Symbol</th>
-                <th className="py-1.5 text-right font-medium">Shares</th>
-                <th className="py-1.5 text-right font-medium">Cost basis</th>
-                <th className="py-1.5 text-right font-medium">Dividends</th>
-                <th className="px-4 py-1.5 text-right font-medium">% returned</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(holdings.data ?? []).map((h) => (
-                <tr key={h.symbol} className="border-b border-border-light/40">
-                  <td className="px-4 py-1.5 font-medium text-fg">{h.symbol}</td>
-                  <td className="py-1.5 text-right text-xs text-fg-muted tabular-nums">
-                    {Number(h.shares).toLocaleString()}
-                  </td>
-                  <td className="py-1.5 text-right text-xs tabular-nums text-fg-muted">{formatUsd(h.cashCostBasis)}</td>
-                  <td className="py-1.5 text-right text-xs tabular-nums text-success">{formatUsd(h.dividendsReceived)}</td>
-                  <td className="px-4 py-1.5 text-right text-xs tabular-nums text-accent">{h.pctCapitalReturned}%</td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-[10px] uppercase tracking-wide text-fg-subtle">
+                <tr className="border-b border-border-light/50">
+                  <th className="px-4 py-1.5 text-left font-medium">Symbol</th>
+                  <th className="py-1.5 text-right font-medium">Shares</th>
+                  <th className="py-1.5 text-right font-medium">Cost</th>
+                  <th className="py-1.5 text-right font-medium">Mark</th>
+                  <th className="py-1.5 text-right font-medium">Mkt value</th>
+                  <th className="py-1.5 text-right font-medium">Unreal.</th>
+                  <th className="py-1.5 text-right font-medium">Divs</th>
+                  <th className="px-4 py-1.5 text-right font-medium">Total ret.</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {(holdings.data ?? []).map((h) => {
+                  const unreal = h.unrealizedPnl == null ? null : Number(h.unrealizedPnl);
+                  const tot = h.totalReturn == null ? null : Number(h.totalReturn);
+                  return (
+                    <tr key={h.symbol} className="border-b border-border-light/40">
+                      <td className="px-4 py-1.5 font-medium text-fg">{h.symbol}</td>
+                      <td className="py-1.5 text-right text-xs text-fg-muted tabular-nums">
+                        {Number(h.shares).toLocaleString()}
+                      </td>
+                      <td className="py-1.5 text-right text-xs tabular-nums text-fg-muted">{formatUsd(h.cashCostBasis)}</td>
+                      <td className="py-1.5 text-right text-xs tabular-nums text-fg-muted">
+                        {h.mark == null ? "—" : `$${Number(h.mark).toFixed(2)}`}
+                      </td>
+                      <td className="py-1.5 text-right text-xs tabular-nums text-fg">
+                        {h.marketValue == null ? "—" : formatUsd(h.marketValue)}
+                      </td>
+                      <td className={cn("py-1.5 text-right text-xs tabular-nums", unreal == null ? "text-fg-subtle" : pnlClass(unreal))}>
+                        {unreal == null ? "—" : formatUsd(h.unrealizedPnl!)}
+                      </td>
+                      <td className="py-1.5 text-right text-xs tabular-nums text-success">{formatUsd(h.dividendsReceived)}</td>
+                      <td className={cn("px-4 py-1.5 text-right text-xs font-medium tabular-nums", tot == null ? "text-accent" : pnlClass(tot))}>
+                        {tot == null ? "—" : formatUsd(h.totalReturn!)}
+                        {h.totalReturnPct != null && (
+                          <span className="ml-1 text-[10px] text-fg-subtle">({h.totalReturnPct}%)</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
           {holdings.data && holdings.data.length === 0 && (
             <p className="p-4 text-sm text-fg-muted">No ETF holdings.</p>
           )}
@@ -315,6 +344,58 @@ export function Cube() {
           )}
         </section>
       </div>
+
+      {/* open futures / equity positions — marked to market (or flat) */}
+      <section className="mt-4 rounded-md border border-border bg-card">
+        <div className="border-b border-border px-4 py-2 text-[10px] font-medium uppercase tracking-wide text-fg-subtle">
+          Open positions · live futures &amp; equities · marked-to-market
+        </div>
+        {openPositions.data && openPositions.data.length === 0 ? (
+          <p className="px-4 py-3 text-sm text-fg-muted">
+            Flat — no live futures or equity positions. (Expired/rolled contracts are settled, not held.)
+          </p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="text-[10px] uppercase tracking-wide text-fg-subtle">
+              <tr className="border-b border-border-light/50">
+                <th className="px-4 py-1.5 text-left font-medium">Symbol</th>
+                <th className="py-1.5 text-left font-medium">Dir</th>
+                <th className="py-1.5 text-right font-medium">Qty</th>
+                <th className="py-1.5 text-right font-medium">Avg cost</th>
+                <th className="py-1.5 text-right font-medium">Mark</th>
+                <th className="py-1.5 text-right font-medium">Mkt value</th>
+                <th className="px-4 py-1.5 text-right font-medium">Unrealized</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(openPositions.data ?? []).map((p) => {
+                const u = p.unrealizedPnl == null ? null : Number(p.unrealizedPnl);
+                return (
+                  <tr key={p.symbol} className="border-b border-border-light/40">
+                    <td className="px-4 py-1.5 font-mono text-xs text-fg">{p.symbol}</td>
+                    <td className={cn("py-1.5 text-xs", p.direction === "LONG" ? "text-success" : "text-danger")}>
+                      {p.direction === "LONG" ? "L" : "S"}
+                    </td>
+                    <td className="py-1.5 text-right text-xs tabular-nums text-fg-muted">{Number(p.qty)}</td>
+                    <td className="py-1.5 text-right text-xs tabular-nums text-fg-muted">
+                      {p.avgCost == null ? "—" : `$${Number(p.avgCost).toFixed(2)}`}
+                    </td>
+                    <td className="py-1.5 text-right text-xs tabular-nums text-fg-muted">
+                      {p.mark == null ? "—" : `$${Number(p.mark).toFixed(2)}`}
+                    </td>
+                    <td className="py-1.5 text-right text-xs tabular-nums text-fg">
+                      {p.marketValue == null ? "—" : formatUsd(p.marketValue)}
+                    </td>
+                    <td className={cn("px-4 py-1.5 text-right text-xs font-medium tabular-nums", u == null ? "text-fg-subtle" : pnlClass(u))}>
+                      {u == null ? "—" : formatUsd(p.unrealizedPnl!)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </section>
         </>
       )}
     </main>
