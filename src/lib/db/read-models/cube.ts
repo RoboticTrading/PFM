@@ -121,6 +121,7 @@ export const cubeProperty = cube.table("property", {
   address: text("address"),
   purchasePrice: numeric("purchase_price"),
   purchaseDate: date("purchase_date"),
+  kind: text("kind"), // real_estate | vehicle | ...
   active: text("active"),
 });
 

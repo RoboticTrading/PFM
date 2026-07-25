@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { PropertyChart } from "@/components/cube/PropertyChart";
 import { formatUsd } from "@/lib/money";
 import { trpc } from "@/lib/trpc/client";
@@ -10,39 +12,75 @@ function pnlClass(v: number) {
 }
 
 /**
- * The house as a marked-to-market asset — Bob's BolivarDr model, live: current value / adjusted cost /
- * equity, the value-vs-cost chart, and the basis footprints by category (expenses inflate, rent
- * deflates). Cash-purchased, unencumbered — the value is pure equity.
+ * Tracked hard assets — real estate + vehicles — as marked-to-market positions (Bob's BolivarDr model
+ * generalized). Each: current value vs adjusted cost vs diff. For the house diff = equity; for a car
+ * (depreciating, no rent) diff = true cost of ownership (value − everything sunk in). Pick an asset to
+ * see its value-vs-cost chart and basis footprints.
  */
 export function HousePanel() {
   const properties = trpc.cube.properties.useQuery();
-  const property = properties.data?.[0];
-  const key = property?.propertyKey ?? "";
-  const daily = trpc.cube.propertyDaily.useQuery({ propertyKey: key }, { enabled: !!key });
-  const ledger = trpc.cube.propertyLedger.useQuery({ propertyKey: key }, { enabled: !!key });
+  const [key, setKey] = useState<string | null>(null);
+
+  const list = properties.data ?? [];
+  const selected = list.find((p) => p.propertyKey === key) ?? list[0];
+  useEffect(() => {
+    if (!key && list[0]) setKey(list[0].propertyKey);
+  }, [key, list]);
+
+  const daily = trpc.cube.propertyDaily.useQuery(
+    { propertyKey: selected?.propertyKey ?? "" },
+    { enabled: !!selected },
+  );
+  const ledger = trpc.cube.propertyLedger.useQuery(
+    { propertyKey: selected?.propertyKey ?? "" },
+    { enabled: !!selected },
+  );
 
   if (properties.data && properties.data.length === 0) {
     return (
       <section className="mt-4 rounded-md border border-border bg-card px-4 py-3">
-        <div className="text-[10px] font-medium uppercase tracking-wide text-fg-subtle">Real estate</div>
-        <p className="mt-1 text-sm text-fg-muted">
-          No property configured yet. Seed one via the house asset setup (RentCast valuation).
-        </p>
+        <div className="text-[10px] font-medium uppercase tracking-wide text-fg-subtle">Hard assets</div>
+        <p className="mt-1 text-sm text-fg-muted">No assets configured yet.</p>
       </section>
     );
   }
-  if (!property) return null;
+  if (!selected) return null;
 
-  const value = property.value == null ? null : Number(property.value);
-  const cost = property.adjustedCost == null ? null : Number(property.adjustedCost);
-  const diff = property.diff == null ? null : Number(property.diff);
+  const isVehicle = selected.kind === "vehicle";
+  const value = selected.value == null ? null : Number(selected.value);
+  const cost = selected.adjustedCost == null ? null : Number(selected.adjustedCost);
+  const diff = selected.diff == null ? null : Number(selected.diff);
 
   return (
     <section className="mt-4">
+      {/* asset selector — one chip per tracked asset */}
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <span className="text-[10px] font-medium uppercase tracking-wide text-fg-subtle">Hard assets</span>
+        {list.map((p) => {
+          const d = p.diff == null ? null : Number(p.diff);
+          return (
+            <button
+              key={p.propertyKey}
+              onClick={() => setKey(p.propertyKey)}
+              className={cn(
+                "flex items-center gap-2 rounded-md border px-3 py-1 text-xs transition-colors",
+                p.propertyKey === selected.propertyKey
+                  ? "border-accent/40 bg-accent/10 text-accent"
+                  : "border-border text-fg-muted hover:bg-muted",
+              )}
+            >
+              <span className="font-medium">{p.label}</span>
+              <span className="tabular-nums text-fg">{p.value == null ? "—" : formatUsd(p.value)}</span>
+              {d != null && <span className={cn("tabular-nums", pnlClass(d))}>{formatUsd(p.diff!)}</span>}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="mb-2 flex items-center justify-between">
         <div>
-          <h2 className="font-display text-sm font-semibold text-accent">{property.label}</h2>
-          <p className="text-[11px] text-fg-subtle">{property.address}</p>
+          <h2 className="font-display text-sm font-semibold text-accent">{selected.label}</h2>
+          <p className="text-[11px] text-fg-subtle">{selected.address}</p>
         </div>
         <div className="flex items-center gap-5 text-right">
           <div>
@@ -50,11 +88,11 @@ export function HousePanel() {
             <div className="text-lg font-semibold tabular-nums text-fg">{value == null ? "—" : formatUsd(String(value))}</div>
           </div>
           <div>
-            <div className="text-[10px] uppercase tracking-wide text-fg-subtle">Adj. cost</div>
+            <div className="text-[10px] uppercase tracking-wide text-fg-subtle">{isVehicle ? "All-in cost" : "Adj. cost"}</div>
             <div className="text-lg font-semibold tabular-nums text-fg-muted">{cost == null ? "—" : formatUsd(String(cost))}</div>
           </div>
           <div>
-            <div className="text-[10px] uppercase tracking-wide text-fg-subtle">Equity</div>
+            <div className="text-[10px] uppercase tracking-wide text-fg-subtle">{isVehicle ? "Cost of ownership" : "Equity"}</div>
             <div className={cn("text-lg font-semibold tabular-nums", diff == null ? "text-fg" : pnlClass(diff))}>
               {diff == null ? "—" : formatUsd(String(diff))}
             </div>

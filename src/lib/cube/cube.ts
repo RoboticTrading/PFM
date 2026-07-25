@@ -373,19 +373,21 @@ export interface PropertyRow {
   propertyKey: string;
   label: string;
   address: string;
+  kind: string;
   value: string | null;
   adjustedCost: string | null;
   diff: string | null;
   asOf: string | null;
 }
 
-/** The tracked properties with their latest value / adjusted cost / equity diff. */
+/** The tracked assets (real estate + vehicles) with their latest value / adjusted cost / equity diff. */
 export async function cubePropertyList(): Promise<PropertyRow[]> {
   return getDb()
     .select({
       propertyKey: cubeProperty.propertyKey,
       label: sql<string>`coalesce(${cubeProperty.label},'—')`,
       address: sql<string>`coalesce(${cubeProperty.address},'')`,
+      kind: sql<string>`coalesce(${cubeProperty.kind},'real_estate')`,
       value: sql<string | null>`round((SELECT pd.value FROM cube.property_daily pd
         WHERE pd.property_key = ${cubeProperty.propertyKey} ORDER BY pd.d DESC LIMIT 1)::numeric,2)::text`,
       adjustedCost: sql<string | null>`round((SELECT pd.adjusted_cost FROM cube.property_daily pd
@@ -396,7 +398,8 @@ export async function cubePropertyList(): Promise<PropertyRow[]> {
         WHERE pd.property_key = ${cubeProperty.propertyKey} ORDER BY pd.d DESC LIMIT 1)::text`,
     })
     .from(cubeProperty)
-    .where(sql`${cubeProperty.active} IS NULL OR ${cubeProperty.active}::bool`) as Promise<PropertyRow[]>;
+    .where(sql`${cubeProperty.active} IS NULL OR ${cubeProperty.active}::bool`)
+    .orderBy(cubeProperty.kind, cubeProperty.label) as Promise<PropertyRow[]>;
 }
 
 export interface PropertyDailyPoint {
