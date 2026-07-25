@@ -167,6 +167,7 @@ export const cubeOpenPositions = cube.table("open_positions", {
  * `is_liability` flag makes the sign explicit for the net-worth roll-up.
  */
 export const cubeAccountSnapshot = cube.table("account_snapshot", {
+  accountKey: text("account_key"), // FK to cube.account.account_key — the stable join key
   account: text("account"),
   kind: text("kind"), // checking | brokerage | credit-card
   balance: numeric("balance"),
@@ -184,6 +185,33 @@ export const cubeCashFlows = cube.table("cash_flows", {
   rollup: text("rollup"), // income | expense | transfer | settlement (the category-tree bucket)
   amount: numeric("amount"),
   description: text("description"),
+});
+
+/**
+ * The unified ledger — one row per transaction across EVERY account (checking, the 4 cards,
+ * brokerage trades + non-trade activity). This is the single source of truth PFM reads
+ * transactions from; it supersedes the scattered per-source `v_transactions` /
+ * `v_trade_transactions` / `v_nontrade_transactions` views. `amount` is signed (+in / −out).
+ * Lineage key is (`source_schema`, `source_txn_id`) — stable, referenced, never copied.
+ */
+export const cubeVLedger = cube.table("v_ledger", {
+  accountKey: text("account_key"),
+  accountName: text("account_name"),
+  kind: text("kind"), // checking | credit-card | brokerage
+  sourceSchema: text("source_schema"),
+  sourceTxnId: text("source_txn_id"),
+  txnDate: date("txn_date"),
+  description: text("description"),
+  amount: numeric("amount"),
+  symbol: text("symbol"),
+});
+
+/** The unified account registry — one row per real account (checking, 4 cards, brokerage). */
+export const cubeAccount = cube.table("account", {
+  accountKey: text("account_key"),
+  name: text("name"),
+  kind: text("kind"), // checking | credit-card | brokerage
+  active: boolean("active"),
 });
 
 /** The dimensions the Cube slices by — the graph's join keys. */

@@ -11,14 +11,16 @@ vi.mock("@/lib/trpc/client", () => ({
           isError: false,
           data: [
             {
-              id: "11111111-1111-1111-1111-111111111111",
+              id: "schwab_checking",
               name: "Schwab Checking",
               kind: "checking",
               active: true,
-              sourceSchema: "schwab_checking",
-              sourceView: "v_transactions",
+              sourceLabel: "schwab_checking",
               institutionName: "Charles Schwab — Bank",
               institutionKind: "bank",
+              balance: "1500.0000",
+              asOfDate: "2026-07-25",
+              isLiability: false,
             },
           ],
         }),
@@ -55,12 +57,9 @@ describe("AccountsTable", () => {
     );
 
     const link = screen.getByRole("link", { name: "Schwab Checking" });
-    expect(link).toHaveAttribute(
-      "href",
-      "/accounts/11111111-1111-1111-1111-111111111111",
-    );
+    expect(link).toHaveAttribute("href", "/accounts/schwab_checking");
     expect(screen.getByText("Charles Schwab — Bank")).toBeInTheDocument();
-    expect(screen.getByText("schwab_checking.v_transactions")).toBeInTheDocument();
+    expect(screen.getByText("schwab_checking")).toBeInTheDocument();
     // formatted live balance
     expect(screen.getByText("$1,500.00")).toBeInTheDocument();
   });

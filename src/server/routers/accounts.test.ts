@@ -1,8 +1,6 @@
 import { afterAll, expect, it } from "vitest";
 
-import { getDb, getSql, schema } from "@/lib/db";
-import { seedAccounts } from "@/lib/db/seed";
-import { ACCOUNTS } from "@/lib/accounts/registry";
+import { getSql } from "@/lib/db";
 import { describeDb } from "@/test/db";
 
 import { createContext } from "../context";
@@ -11,41 +9,29 @@ import { appRouter } from "./_app";
 
 const call = createCallerFactory(appRouter)(createContext());
 
-describeDb("accounts registry (live MyDB)", () => {
+describeDb("accounts registry (live MyDB, cube.account)", () => {
   afterAll(async () => {
     await getSql().end({ timeout: 5 });
   });
 
-  it("syncs the registry idempotently", async () => {
-    // Seed twice; assert each registry account exists exactly once. (Counting
-    // by natural key is robust to unrelated test accounts created concurrently
-    // by other suites against the same MyDB.)
-    await seedAccounts(getDb());
-    await seedAccounts(getDb());
-    const rows = await getDb()
-      .select({
-        sourceSchema: schema.account.sourceSchema,
-        sourceView: schema.account.sourceView,
-      })
-      .from(schema.account);
-    for (const spec of ACCOUNTS) {
-      const matches = rows.filter(
-        (r) =>
-          r.sourceSchema === spec.sourceSchema &&
-          r.sourceView === spec.sourceView,
-      );
-      expect(matches, `${spec.sourceSchema}.${spec.sourceView}`).toHaveLength(1);
-    }
-  });
-
-  it("accounts.list returns registry accounts joined with their institution", async () => {
-    await seedAccounts(getDb());
+  it("accounts.list returns every cube account, institution-enriched with a balance", async () => {
     const list = await call.accounts.list();
-    expect(list.length).toBeGreaterThanOrEqual(ACCOUNTS.length);
+    // checking + 4 cards + brokerage
+    expect(list.length).toBeGreaterThanOrEqual(6);
 
-    const checking = list.find((a) => a.sourceSchema === "schwab_checking");
+    const checking = list.find((a) => a.id === "schwab_checking");
     expect(checking).toBeDefined();
+    expect(checking?.kind).toBe("checking");
     expect(checking?.institutionName).toBe("Charles Schwab — Bank");
     expect(checking?.institutionKind).toBe("bank");
+    // A snapshot-sourced current balance is present as a fixed-precision string.
+    expect(typeof checking?.balance).toBe("string");
+  });
+
+  it("accounts.byId resolves a cube account_key", async () => {
+    const acct = await call.accounts.byId({ id: "bofa_card" });
+    expect(acct).not.toBeNull();
+    expect(acct?.kind).toBe("credit-card");
+    expect(acct?.institutionName).toBe("Bank of America");
   });
 });

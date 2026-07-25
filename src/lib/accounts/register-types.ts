@@ -8,6 +8,9 @@ import type { CanonicalTxn } from "@/lib/db/read-models";
 /** Sentinel category for a transaction split across multiple categories. */
 export const SPLIT_CATEGORY = "__split";
 
+/** Sentinel account id meaning "all accounts unified" (no account filter). */
+export const ALL_ACCOUNTS = "__all";
+
 /** A canonical transaction enriched with its PFM categorization (for the register). */
 export interface RegisterTxn extends CanonicalTxn {
   /** Category id, the {@link SPLIT_CATEGORY} sentinel, or null if uncategorized. */

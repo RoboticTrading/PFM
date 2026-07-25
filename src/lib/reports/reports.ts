@@ -1,7 +1,7 @@
 import { and, asc, eq, gte, lte, sql } from "drizzle-orm";
 
-import { accountBalance } from "@/lib/accounts/balance";
 import { getDb, schema } from "@/lib/db";
+import { listLedgerAccounts } from "@/lib/db/read-models";
 import { sumMoney } from "@/lib/money";
 
 export interface DateRange {
@@ -95,21 +95,12 @@ export interface NetWorth {
   byAccount: { accountId: string; name: string; balance: string }[];
 }
 
-/** Σ of every account's current balance (balanceForward + Σ since). */
+/** Σ of every active account's current balance, from `cube.account_snapshot`. */
 export async function netWorth(): Promise<NetWorth> {
-  const accounts = await getDb()
-    .select({ id: schema.account.id, name: schema.account.name })
-    .from(schema.account)
-    .where(eq(schema.account.active, true))
-    .orderBy(asc(schema.account.name));
-
-  const byAccount = await Promise.all(
-    accounts.map(async (a) => ({
-      accountId: a.id,
-      name: a.name,
-      balance: (await accountBalance(a.id)).balance,
-    })),
-  );
+  const accounts = await listLedgerAccounts();
+  const byAccount = accounts
+    .filter((a) => a.active)
+    .map((a) => ({ accountId: a.id, name: a.name, balance: a.balance }));
 
   return {
     total: sumMoney(byAccount.map((b) => b.balance)),

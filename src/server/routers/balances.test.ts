@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { afterAll, expect, it } from "vitest";
 
 import { getDb, getSql, schema } from "@/lib/db";
+import { cubeAccountSnapshot } from "@/lib/db/read-models/cube";
 import { seedAccounts } from "@/lib/db/seed";
 import { toScaled } from "@/lib/money";
 import { describeDb } from "@/test/db";
@@ -11,12 +12,10 @@ import { createCallerFactory } from "../trpc";
 import { appRouter } from "./_app";
 
 const call = createCallerFactory(appRouter)(createContext());
-// Far-future anchor → no source transactions after it, so `since` is exactly 0
-// and the balance equals the forward amount (deterministic, data-independent).
 const ANCHOR = "2999-12-31";
 
-describeDb("balance-forward + accountBalance (live MyDB)", () => {
-  let accountId: string;
+describeDb("balances (live MyDB, cube.account_snapshot)", () => {
+  let accountId: string | undefined;
 
   afterAll(async () => {
     const db = getDb();
@@ -36,7 +35,26 @@ describeDb("balance-forward + accountBalance (live MyDB)", () => {
     await getSql().end({ timeout: 5 });
   });
 
-  it("setForward then accountBalance = forward + Σ since (since=0 at anchor)", async () => {
+  it("forAccount returns the current balance from cube.account_snapshot", async () => {
+    const res = await call.balances.forAccount({ accountId: "schwab_checking" });
+    expect(typeof res.balance).toBe("string");
+    // The whole balance is the snapshot (forward), with `since` = 0.
+    expect(res.forward).toBe(res.balance);
+    expect(toScaled(res.since)).toBe(0n);
+
+    const [snap] = await getDb()
+      .select()
+      .from(cubeAccountSnapshot)
+      .where(eq(cubeAccountSnapshot.kind, "checking"))
+      .limit(1);
+    if (snap) {
+      expect(toScaled(res.balance)).toBe(toScaled(snap.balance ?? "0"));
+      expect(res.asOfDate).toBe(snap.asOf);
+    }
+  });
+
+  it("setForward still upserts an app-owned balance_forward row (unchanged)", async () => {
+    // The app-owned write path (financialmanager.balance_forward) is preserved.
     await seedAccounts(getDb());
     const [checking] = await getDb()
       .select()
@@ -51,21 +69,16 @@ describeDb("balance-forward + accountBalance (live MyDB)", () => {
       amount: "1234.5600",
     });
 
-    const res = await call.balances.forAccount({ accountId });
-    expect(res.asOfDate).toBe(ANCHOR);
-    expect(res.forward).toBe("1234.5600");
-    expect(toScaled(res.since)).toBe(0n);
-    expect(res.balance).toBe("1234.5600");
-  });
-
-  it("setForward upserts (same account+date updates the amount)", async () => {
-    await call.balances.setForward({
-      accountId,
-      asOfDate: ANCHOR,
-      amount: "2000.0000",
-    });
-    const res = await call.balances.forAccount({ accountId });
-    expect(res.forward).toBe("2000.0000");
-    expect(res.balance).toBe("2000.0000");
+    const [row] = await getDb()
+      .select()
+      .from(schema.balanceForward)
+      .where(
+        and(
+          eq(schema.balanceForward.accountId, accountId),
+          eq(schema.balanceForward.asOfDate, ANCHOR),
+        ),
+      )
+      .limit(1);
+    expect(row?.amount).toBe("1234.5600");
   });
 });

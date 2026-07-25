@@ -7,7 +7,6 @@ import { formatUsd } from "@/lib/money";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 
-import { BalanceForwardForm } from "./BalanceForwardForm";
 import { KindBadge } from "./KindBadge";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -57,18 +56,9 @@ export function AccountDetail({ id }: { id: string }) {
         </div>
         {balance.data && (
           <p className="mt-2 text-xs text-fg-subtle">
-            forward {formatUsd(balance.data.forward)}
-            {balance.data.asOfDate ? ` as of ${balance.data.asOfDate}` : " (none set)"}
-            {" + since "}
-            {formatUsd(balance.data.since)}
+            from the unified ledger
+            {balance.data.asOfDate ? ` · as of ${balance.data.asOfDate}` : ""}
           </p>
-        )}
-        {balance.data && (
-          <BalanceForwardForm
-            accountId={id}
-            currentAsOf={balance.data.asOfDate}
-            currentAmount={balance.data.forward}
-          />
         )}
       </section>
 
@@ -80,7 +70,7 @@ export function AccountDetail({ id }: { id: string }) {
           label="Source"
           value={
             <span className="font-mono text-xs text-fg-muted">
-              {a.sourceSchema}.{a.sourceView}
+              {a.sourceLabel}
             </span>
           }
         />

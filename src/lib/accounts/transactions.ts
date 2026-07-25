@@ -1,43 +1,18 @@
-import { eq } from "drizzle-orm";
+import { type CanonicalTxn, listLedgerTransactions } from "@/lib/db/read-models";
 
-import { getDb, schema } from "@/lib/db";
-import {
-  type BankSourceSchema,
-  BANK_SOURCES,
-  type CanonicalTxn,
-  listBankTransactions,
-  listNontradeTransactions,
-  listTradeTransactions,
-} from "@/lib/db/read-models";
+import { ALL_ACCOUNTS } from "./register-types";
 
 /**
- * Resolve an account to its source read-model and return canonical transactions
- * (newest first). The account's `sourceSchema`/`sourceView` pick the read-model;
- * nothing is copied — these are reads over the RO source views.
+ * Canonical transactions for an account (newest first), read from the unified
+ * `cube.v_ledger`. The `accountKey` is `cube.account.account_key`; pass the
+ * {@link ALL_ACCOUNTS} sentinel to stream every account unified. Nothing is
+ * copied — this is a read over the RO ledger; lineage stays (source_schema,
+ * source_txn_id).
  */
 export async function accountTransactions(
-  accountId: string,
+  accountKey: string,
   opts: { limit?: number } = {},
 ): Promise<CanonicalTxn[]> {
-  const [acct] = await getDb()
-    .select({
-      sourceSchema: schema.account.sourceSchema,
-      sourceView: schema.account.sourceView,
-    })
-    .from(schema.account)
-    .where(eq(schema.account.id, accountId))
-    .limit(1);
-  if (!acct) throw new Error(`Unknown account: ${accountId}`);
-
-  if (acct.sourceSchema === "schwab_brokerage") {
-    return acct.sourceView === "v_trade_transactions"
-      ? listTradeTransactions(opts)
-      : listNontradeTransactions(opts);
-  }
-  if (acct.sourceSchema in BANK_SOURCES) {
-    return listBankTransactions(acct.sourceSchema as BankSourceSchema, opts);
-  }
-  throw new Error(
-    `No read-model for ${acct.sourceSchema}.${acct.sourceView}`,
-  );
+  const key = accountKey === ALL_ACCOUNTS ? undefined : accountKey;
+  return listLedgerTransactions(key, opts);
 }

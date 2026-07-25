@@ -1,3 +1,4 @@
+import type { cubeVLedger } from "@/lib/db/read-models/cube";
 import type {
   vCheckingTransactions,
   vNontradeTransactions,
@@ -50,4 +51,17 @@ export const nontradeTxnFixture: typeof vNontradeTransactions.$inferSelect = {
   description: "Qualified dividend",
   assetType: "EQUITY",
   subAccount: "CASH",
+};
+
+/** A `cube.v_ledger` row (the unified all-account ledger PFM now reads from). */
+export const ledgerTxnFixture: typeof cubeVLedger.$inferSelect = {
+  accountKey: "bofa_card",
+  accountName: "Bank of America Card",
+  kind: "credit-card",
+  sourceSchema: "bank_of_america_credit_card",
+  sourceTxnId: "778812",
+  txnDate: "2026-07-01",
+  description: "COSTCO WHOLESALE",
+  amount: "-241.87",
+  symbol: null,
 };

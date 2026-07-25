@@ -37,8 +37,8 @@ export const balancesRouter = router({
     },
   }),
 
-  /** Current balance = latest balance-forward + Σ source transactions since. */
+  /** Current balance from `cube.account_snapshot`. `accountId` is the cube account_key. */
   forAccount: publicProcedure
-    .input(z.object({ accountId: z.string().uuid() }))
+    .input(z.object({ accountId: z.string().min(1) }))
     .query(({ input }) => accountBalance(input.accountId)),
 });

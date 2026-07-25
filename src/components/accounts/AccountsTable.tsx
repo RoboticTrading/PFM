@@ -60,7 +60,7 @@ export function AccountsTable() {
               <KindBadge kind={a.kind} />
             </TableCell>
             <TableCell className="font-mono text-xs text-fg-subtle">
-              {a.sourceSchema}.{a.sourceView}
+              {a.sourceLabel}
             </TableCell>
             <TableCell className="text-right">
               <BalanceCell accountId={a.id} />

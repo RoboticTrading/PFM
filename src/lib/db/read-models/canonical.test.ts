@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   bankTxnFixture,
+  ledgerTxnFixture,
   nontradeTxnFixture,
   tradeTxnFixture,
 } from "@/test/fixtures/transactions";
 
+import { toCanonicalLedger } from "./ledger";
 import {
   toCanonicalBankTxn,
   toCanonicalNontrade,
@@ -38,5 +40,18 @@ describe("canonical transaction projections", () => {
     expect(c.sourceView).toBe("v_nontrade_transactions");
     expect(c.amount).toBe("24.00");
     expect(c.description).toBe("Qualified dividend");
+  });
+
+  it("projects a unified ledger row, passing source_schema/source_txn_id through as the lineage key", () => {
+    const c = toCanonicalLedger(ledgerTxnFixture);
+    expect(c).toMatchObject({
+      sourceSchema: "bank_of_america_credit_card",
+      sourceView: "v_ledger",
+      sourceTxnId: "778812",
+      date: "2026-07-01",
+      description: "COSTCO WHOLESALE",
+      amount: "-241.87",
+    });
+    expect(c.symbol).toBeUndefined();
   });
 });

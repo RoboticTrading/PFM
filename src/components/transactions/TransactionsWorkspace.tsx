@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { SPLIT_CATEGORY } from "@/lib/accounts/register-types";
+import { ALL_ACCOUNTS, SPLIT_CATEGORY } from "@/lib/accounts/register-types";
 import { formatUsd } from "@/lib/money";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
@@ -100,6 +100,7 @@ export function TransactionsWorkspace() {
             onChange={(e) => setAccountId(e.target.value)}
             className="min-w-[16rem] rounded-md border border-border bg-base px-2 py-1.5 text-sm text-fg outline-none focus-visible:border-accent"
           >
+            <option value={ALL_ACCOUNTS}>All accounts</option>
             {(accounts.data ?? []).map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name} · {a.institutionName}
