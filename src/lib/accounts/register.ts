@@ -149,6 +149,11 @@ function baseConditions(q: RegisterQuery): SQL[] {
   const conds: SQL[] = [];
   if (q.accountKey) conds.push(eq(cubeVLedger.accountKey, q.accountKey));
 
+  // Trade legs (options/futures/equity fills) are NOT categorizable — a leg is half a round-trip,
+  // not income/expense. The matched positions already roll up as Income/Trading in cube.structures,
+  // so drop the raw trade-view rows from the categorization register (dividends/fees/transfers stay).
+  conds.push(sql`${cubeVLedger.sourceSchema} NOT LIKE '%v_trade_transactions'`);
+
   const text = q.query?.trim();
   if (text) {
     // Escape LIKE metacharacters so search stays a literal substring match.

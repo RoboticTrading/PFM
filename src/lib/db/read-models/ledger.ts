@@ -1,4 +1,4 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 
 import { getDb } from "../index";
 import {
@@ -55,10 +55,13 @@ export async function listLedgerTransactions(
   accountKey?: string,
   opts: ListOpts = {},
 ): Promise<CanonicalTxn[]> {
+  // Trade legs (options/futures/equity fills) aren't categorizable transactions — they belong to
+  // matched positions (cube.structures, already Income/Trading). Exclude the raw trade-view rows.
+  const notTradeLeg = sql`${cubeVLedger.sourceSchema} NOT LIKE '%v_trade_transactions'`;
   const rows = await getDb()
     .select()
     .from(cubeVLedger)
-    .where(accountKey ? eq(cubeVLedger.accountKey, accountKey) : undefined)
+    .where(accountKey ? and(eq(cubeVLedger.accountKey, accountKey), notTradeLeg) : notTradeLeg)
     .orderBy(desc(cubeVLedger.txnDate), desc(cubeVLedger.sourceTxnId))
     .limit(opts.limit ?? DEFAULT_LIMIT);
 
