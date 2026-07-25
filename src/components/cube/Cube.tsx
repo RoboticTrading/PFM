@@ -37,6 +37,8 @@ export function Cube() {
   const perf = trpc.cube.performance.useQuery({ dimension, filter: {} });
   const trades = trpc.cube.trades.useQuery({ ...filter, limit: 150 });
   const health = trpc.cube.matchHealth.useQuery();
+  const holdings = trpc.cube.holdings.useQuery();
+  const cashFlow = trpc.cube.cashFlow.useQuery();
 
   const maxAbs = useMemo(() => {
     const rows = perf.data ?? [];
@@ -194,6 +196,65 @@ export function Cube() {
             </table>
             {trades.isLoading && <p className="p-4 text-sm text-fg-muted">Loading…</p>}
           </div>
+        </section>
+      </div>
+
+      {/* holdings + broker cash flow — the non-trade facts */}
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <section className="rounded-md border border-border bg-card">
+          <div className="border-b border-border px-4 py-2 text-[10px] font-medium uppercase tracking-wide text-fg-subtle">
+            Holdings & Income · covered-call ETF sleeve
+          </div>
+          <table className="w-full text-sm">
+            <thead className="text-[10px] uppercase tracking-wide text-fg-subtle">
+              <tr className="border-b border-border-light/50">
+                <th className="px-4 py-1.5 text-left font-medium">Symbol</th>
+                <th className="py-1.5 text-right font-medium">Shares</th>
+                <th className="py-1.5 text-right font-medium">Cost basis</th>
+                <th className="py-1.5 text-right font-medium">Dividends</th>
+                <th className="px-4 py-1.5 text-right font-medium">% returned</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(holdings.data ?? []).map((h) => (
+                <tr key={h.symbol} className="border-b border-border-light/40">
+                  <td className="px-4 py-1.5 font-medium text-fg">{h.symbol}</td>
+                  <td className="py-1.5 text-right text-xs text-fg-muted tabular-nums">
+                    {Number(h.shares).toLocaleString()}
+                  </td>
+                  <td className="py-1.5 text-right text-xs tabular-nums text-fg-muted">{formatUsd(h.cashCostBasis)}</td>
+                  <td className="py-1.5 text-right text-xs tabular-nums text-success">{formatUsd(h.dividendsReceived)}</td>
+                  <td className="px-4 py-1.5 text-right text-xs tabular-nums text-accent">{h.pctCapitalReturned}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {holdings.data && holdings.data.length === 0 && (
+            <p className="p-4 text-sm text-fg-muted">No ETF holdings.</p>
+          )}
+        </section>
+
+        <section className="rounded-md border border-border bg-card">
+          <div className="border-b border-border px-4 py-2 text-[10px] font-medium uppercase tracking-wide text-fg-subtle">
+            Broker cash flow · by category
+          </div>
+          <table className="w-full text-sm">
+            <tbody>
+              {(cashFlow.data ?? []).map((c) => {
+                const v = Number(c.net);
+                return (
+                  <tr key={c.category} className="border-b border-border-light/40">
+                    <td className="px-4 py-1.5 capitalize text-fg">{c.category}</td>
+                    <td className="py-1.5 text-right text-xs text-fg-subtle">{c.n}×</td>
+                    <td className={cn("px-4 py-1.5 text-right tabular-nums", pnlClass(v))}>{formatUsd(c.net)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {cashFlow.data && cashFlow.data.length === 0 && (
+            <p className="p-4 text-sm text-fg-muted">No broker cash flow.</p>
+          )}
         </section>
       </div>
     </main>

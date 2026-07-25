@@ -3,6 +3,8 @@ import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import {
   type CubeDimension,
+  cubeCashFlows,
+  cubeHoldings,
   cubeMatchRuns,
   cubeTrades,
 } from "@/lib/db/read-models/cube";
@@ -168,4 +170,53 @@ export async function cubeMatchHealth(): Promise<MatchHealth[]> {
     });
   }
   return out;
+}
+
+export interface HoldingRow {
+  symbol: string;
+  shares: string;
+  cashCostBasis: string;
+  dividendsReceived: string;
+  netBasis: string;
+  pctCapitalReturned: string;
+  nDividends: number;
+}
+
+/** The covered-call ETF sleeve — held income positions, basis vs dividends collected. */
+export async function cubeHoldingsList(): Promise<HoldingRow[]> {
+  return getDb()
+    .select({
+      symbol: cubeHoldings.symbol,
+      shares: sql<string>`${cubeHoldings.shares}::text`,
+      cashCostBasis: sql<string>`round(${cubeHoldings.cashCostBasis}::numeric,2)::text`,
+      dividendsReceived: sql<string>`round(${cubeHoldings.dividendsReceived}::numeric,2)::text`,
+      netBasis: sql<string>`round(${cubeHoldings.netBasis}::numeric,2)::text`,
+      pctCapitalReturned: sql<string>`round(${cubeHoldings.pctCapitalReturned}::numeric,1)::text`,
+      nDividends: sql<number>`coalesce(${cubeHoldings.nDividends},0)::int`,
+    })
+    .from(cubeHoldings)
+    .orderBy(desc(cubeHoldings.dividendsReceived)) as Promise<HoldingRow[]>;
+}
+
+export interface CashFlowRow {
+  category: string;
+  inflow: string;
+  outflow: string;
+  net: string;
+  n: number;
+}
+
+/** Broker money movement grouped by category — deposits, interest, fees, dividends. */
+export async function cubeCashFlowByCategory(): Promise<CashFlowRow[]> {
+  return getDb()
+    .select({
+      category: sql<string>`coalesce(${cubeCashFlows.category},'—')`,
+      inflow: sql<string>`round(sum(${cubeCashFlows.amount}) filter (where ${cubeCashFlows.amount} > 0)::numeric,2)::text`,
+      outflow: sql<string>`round(sum(${cubeCashFlows.amount}) filter (where ${cubeCashFlows.amount} < 0)::numeric,2)::text`,
+      net: sql<string>`round(sum(${cubeCashFlows.amount})::numeric,2)::text`,
+      n: sql<number>`count(*)::int`,
+    })
+    .from(cubeCashFlows)
+    .groupBy(cubeCashFlows.category)
+    .orderBy(desc(sql`abs(sum(${cubeCashFlows.amount}))`));
 }

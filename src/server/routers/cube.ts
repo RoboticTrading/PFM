@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import {
+  cubeCashFlowByCategory,
+  cubeHoldingsList,
   cubeMatchHealth,
   cubePerformance,
   cubeSummary,
@@ -35,4 +37,10 @@ export const cubeRouter = router({
 
   /** Match-health scorecard — the trust signal (matched vs unmatched). */
   matchHealth: publicProcedure.query(() => cubeMatchHealth()),
+
+  /** The covered-call ETF sleeve — held income positions (basis vs dividends). */
+  holdings: publicProcedure.query(() => cubeHoldingsList()),
+
+  /** Broker money movement by category — deposits, interest, fees, dividends. */
+  cashFlow: publicProcedure.query(() => cubeCashFlowByCategory()),
 });

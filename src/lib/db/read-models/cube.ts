@@ -1,4 +1,4 @@
-import { bigint, integer, numeric, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
+import { bigint, date, integer, numeric, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
 
 /**
  * READ-ONLY read-models over the `cube` schema — the unified financial warehouse.
@@ -40,6 +40,31 @@ export const cubeMatchRuns = cube.table("match_runs", {
   roundTrips: integer("round_trips"),
   leftovers: integer("leftovers"),
   realizedPnl: numeric("realized_pnl"),
+});
+
+/** The covered-call ETF sleeve — held income positions (QYLD/RYLD/XYLD): basis + dividends. */
+export const cubeHoldings = cube.table("holdings_income", {
+  symbol: text("symbol"),
+  shares: numeric("shares"),
+  cashCostBasis: numeric("cash_cost_basis"),
+  dividendsReceived: numeric("dividends_received"),
+  netBasis: numeric("net_basis"),
+  avgCostPerShare: numeric("avg_cost_per_share"),
+  pctCapitalReturned: numeric("pct_capital_returned"),
+  lastDividend: date("last_dividend"),
+  nBuys: integer("n_buys"),
+  nDividends: integer("n_dividends"),
+});
+
+/** Broker money movement — deposits, interest, fees, dividends (the money in/out at the broker). */
+export const cubeCashFlows = cube.table("cash_flows", {
+  flowId: bigint("flow_id", { mode: "number" }),
+  source: text("source"),
+  account: text("account"),
+  flowDate: date("flow_date"),
+  category: text("category"),
+  amount: numeric("amount"),
+  description: text("description"),
 });
 
 /** The dimensions the Cube slices by — the graph's join keys. */
