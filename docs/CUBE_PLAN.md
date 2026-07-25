@@ -1,67 +1,163 @@
-# The Cube — Phase-1 Implementation Plan
+# The Cube — Exhaustive Build Plan
 
-> Grounded execution plan for `CUBE_VISION.md`. Written 2026-07-24 after reading the actual
-> assembly engine + PFM's current state. **Decisions flagged `⟡` are Bob's to make** before I
-> sink hours in — surfacing them now so we don't build the wrong thing.
+> Supersedes the earlier decision-sketch. Written 2026-07-25 after studying little jarvis's
+> assembly engine, PFM's current state, and **grounding in the real trade data on MyDB**. This is
+> the plan of record for building the Cube's **match-all trade engine** + serving layer.
 
-## What already exists (leverage, don't rebuild)
+---
 
-- **The assembly engine** — `0-dte-optimizer/src/zerodte/data/` (`occ.py` OCC parser, `spreads.py`
-  broker-agnostic FIFO round-trip matcher, per-broker adapters `schwab.py`/tastytrade, its own
-  `zerodte.ontology`). Caught the white whale: 100% match across two brokers, 2026-07-22. **Python.**
-- **PFM** — Next.js + tRPC + Drizzle over MyDB, `financialmanager` schema built (migrations 0000–0006:
-  account/category/payee/balance-forward/position/import-batch/audit-log), RO on source schemas,
-  artifact-centric Explorer. **TypeScript.**
-- **Cash flows already landing** — bank + card transactions in per-source schemas on MyDB.
+## 0. What's already true (so we build the gap, not a duplicate)
 
-## The core architecture call ⟡
+- **Cash flow is DONE in PFM.** `reports.ts` already serves `cashFlow`, `categoryReport`, `netWorth`
+  over the bank/card `v_transactions` + Schwab non-trade. The Explorer has transactions/register,
+  accounts, categories, budgets, positions, reports. **We do not rebuild any of that.**
+- **The white whale is caught (option verticals).** `0-dte-optimizer/src/zerodte/data/`:
+  `occ.py` (broker-agnostic OCC parser), `spreads.py` (`SpreadFill` → `pair_round_trips`: contract-
+  level FIFO within `(session, side, short, long)` + a worthless-expiry flatten pass → `RoundTrip`
+  + `Leftover`), adapters `schwab.py`/`tastytrade.py`, `ontology/objects.py`. **100% matched, 0
+  unmatched, 0-DTE.** Same-day, vertical-only.
+- **The gap = MATCH ALL.** Bob trades more than options, and it must reconstruct *everything*.
 
-The engine is **Python**; PFM is **TypeScript**. Two ways to bridge:
+## 1. The real trade universe (grounded on MyDB, 2026-07-25)
 
-- **(A, recommended) Engine-as-batch.** The generalized Python engine runs as a batch job (cron on
-  the swarm, like the recorders) and writes reconstructed round-trips into **Cube fact tables on
-  MyDB**. PFM reads them via Drizzle read-models + tRPC. *Leverages the proven engine as-is, no risky
-  port; PFM stays a pure read/serve layer over the facts.*
-- **(B) Port the engine to TS.** Rewrite `spreads.py`/`occ.py` in TypeScript inside PFM. Cleaner
-  single-language stack, but re-derives a hard, already-solved thing — exactly the white whale we just
-  caught. Not recommended.
+| Broker | Instrument | Trade txns | Span | Matching problem |
+|---|---|---|---|---|
+| tastytrade | Equity Option | 7,202 | 2020–2024 | OCC parse + FIFO, **multi-day** (weeklies/45-DTE) |
+| tastytrade | Future | 1,319 | 2020–2026 | FIFO by **contract**, multi-day |
+| tastytrade | Future Option | 317 | 2021–2022 | future-option symbology + FIFO multi-day |
+| tastytrade | (Money Movement) | 463 | — | **cash**, not a trade → cash-flow fact |
+| tastytrade | Equity Option (Receive Deliver) | 152 | — | **assignment / exercise / expiration** |
+| Schwab | Options (OCC legs in `instruments`) + Equities + ETFs | — | ~2020+ (as far as data honestly supports) | same engine + equity/ETF FIFO |
 
-⟡ **Where do the Cube facts live?** A new **`cube`** schema on MyDB (clean, provenance stays in
-sources), owned by the batch job, granted RO to the `pfm` role — *or* inside `financialmanager`
-(PFM's RW schema; then the batch needs a write path there). I lean **`cube` schema + RO to pfm** —
-keeps PFM's safety model intact (it only ever reads facts).
+`schwab_brokerage.transactions` keys legs via a separate `instruments` table (OCC in `symbol`);
+`tastytrade_brokerage.transactions` is self-describing (`instrument_type`, `underlying_symbol`,
+`symbol`, `action`, `quantity`, `price`, `value`/`value_effect`, `net_value`, fees). ETFs already
+modeled in `schwab_brokerage.etf_transactions` + `etf_basis`.
 
-## The fact tables (the Cube's core)
+## 2. Architecture — engine-as-batch, Cube on MyDB, PFM serves
 
-Joined by shared dimensions: `symbol · underlying · strategy · dte_bucket · side · broker · account ·
-period · category · instrument_type`.
+```
+ broker source tables (RO)                 the generalized engine (Python, batch)              serving
+ ─────────────────────────      ┌───────────────────────────────────────────────┐     ┌──────────────────┐
+ schwab_brokerage.transactions  │  adapters → normalized Fill stream             │     │  PFM (TS)        │
+   + instruments (OCC legs)  ──▶ │    (instrument identity, intent, qty, cash, ts)│ ──▶ │  Drizzle .existing│
+ tastytrade_brokerage.txns   ──▶ │  identity + FIFO round-trip matcher (multi-day)│ w   │  read-models over │
+ schwab_brokerage.etf_*      ──▶ │  structure grouper (legs → spreads/strategies) │ r   │  cube.*           │
+                                 │  → cube.trades / cube.trade_legs / cube.cash_* │ i   │  tRPC + Explorer  │
+                                 │  + match-rate scorecard (matched/unmatched)    │ t   │  sliceable views  │
+                                 └───────────────────────────────────────────────┘ e   └──────────────────┘
+```
 
-| Fact | Source | Status |
-|---|---|---|
-| `trades` (round-trips) | assembly engine (generalized) | needs the multi-day FIFO extension |
-| `cash_flows` | PFM bank/card landing | data exists; needs the fact view |
-| `holdings_income` | `schwab_brokerage.etf_transactions` + `etf_basis` | already modeled; wrap as a fact |
-| `pnl_balances` | derived from the above | derived view |
+- **Why Python batch, not a TS port:** the proven engine is Python; porting the OCC/FIFO core to TS
+  re-derives the white whale. The engine runs as a **swarm batch** (like the recorders), writing a
+  new **`cube`** schema on MyDB. **Decision (mine): `cube` schema, granted RO to the `pfm` role** —
+  PFM only ever *reads* facts, keeping its "can't write source data" safety model fully intact.
+- **PFM stays a pure read/serve layer** over `cube.*` (Drizzle `.existing()` read-models, exactly the
+  pattern already used for the source schemas) → tRPC routers → Explorer views.
 
-## Sequence — value-early (the debt first), per the vision
+## 3. The generalized match-all engine (the core new work)
 
-1. **Cash-flow fact + view FIRST** — the money-in/money-out visibility Bob needs *now* for the debt.
-   Pure PFM/TS: a `cash_flows` read-model over the bank/card schemas + a sliceable Explorer view.
-   **Ships value without touching the Python engine.** ⟡ Confirm this is the right first slice.
-2. **Generalize the trade engine** — the "one real extension": relax the 0-DTE/same-day filter, teach
-   FIFO to span days (multi-day round-trips), add equity + futures adapters. Batch → `cube.trades`.
-3. **Holdings + income** — wrap the ETF basis/dividends as `cube.holdings_income`.
-4. **The serving layer** — unified fact + dimension read-models; Explorer slices "everything, any angle."
-5. **P&L / balances** — derived, per account/strategy/period.
+Lift `occ.py`/`spreads.py` into a broker-**and**-instrument-agnostic matcher. Three layers:
 
-## First concrete step (on Bob's nod)
+### 3a. Normalize → one `Fill` type (adapters do the broker-specific part)
+```
+Fill { source, account, instrument: InstrumentId, intent: OPEN|CLOSE|null,
+       qty: int(signed by buy/sell), price, cash: Decimal(signed, fee-incl), ts }
+InstrumentId = one of:
+   EquityId(symbol)                         # AAPL, QYLD
+   OptionId(underlying, expiry, side, strike, occ_root)   # equity + index options
+   FutureId(root, contract_month)           # /ES 2026-03  (front-month roll aware)
+   FutureOptionId(future, expiry, side, strike)
+```
+- Adapters (`schwab`, `tastytrade`) map their rows → `Fill`s. tastytrade is self-describing;
+  Schwab joins `transactions`→`instruments` and OCC-parses the leg (reuse `parse_occ`).
+- **Intent inference** where the broker doesn't state it: buy-to-open vs sell-to-close is resolved by
+  the FIFO inventory itself (a fill that reduces an open position of the opposite sign is a CLOSE).
 
-Given "value early = the debt," step 1 is the cleanest first win and lowest-risk (no engine port,
-pure PFM): **a `cash_flows` fact read-model + a Cash-Flow Explorer view** (in/out by period, category,
-account) over the transactions already landing. It proves the Cube's serving pattern end-to-end and
-puts the debt picture in front of Bob immediately — then we generalize the engine for trades.
+### 3b. Multi-day FIFO round-trip matcher (the "one real extension")
+- Generalize `pair_round_trips`: **BookKey = InstrumentId** (not the 0-DTE `(session,side,strikes)`),
+  and matching **spans days** — an OPEN lot stays in the book until a later CLOSE (or expiry/assignment)
+  consumes it. Contract-level, FIFO, pro-rated fee-inclusive cash — *the exact logic that already works,
+  with the same-day/session constraint removed.*
+- **Exit paths, generalized:** (1) offsetting close (FIFO), (2) **option expiry** worthless (existing
+  pass, keyed on expiry), (3) **assignment/exercise** (`Receive Deliver`) — the option lot closes and
+  *spawns an equity/future Fill* (assigned shares) that re-enters the FIFO. (4) **futures**: close by
+  offset; roll = close old contract + open new. Equities/ETFs: plain FIFO buy→sell.
 
-**Open decisions for Bob (⟡):** (A vs B bridge — I recommend A) · (facts in a `cube` schema vs
-`financialmanager` — I lean `cube`) · (cash-flow-first vs engine-first — vision says cash-flow, I agree).
+### 3c. Structure grouper (legs → strategies) — a *dimension*, not the matcher
+- The matcher works at the **leg** level (robust, always matches). A second pass groups same-order /
+  same-timestamp legs into **structures** (vertical, iron condor, strangle, covered call, outright) and
+  tags each round-trip with a `strategy` + `structure_type` dimension. Grouping is *additive*: even if a
+  structure is ambiguous, the legs are already matched and in the Cube. (Honest: this is where "6 years
+  of mixed activity" is hard; leg-level match is the safety net so nothing is ever lost.)
 
-*Principles unchanged: provenance in the sources, leverage what's built, value early, truth at the core.*
+### 3d. The honest scorecard (little jarvis's standard)
+- Every run reports **matched vs unmatched by (broker × instrument)** — the "100% / 0 leftover" metric.
+  `Leftover`s are surfaced, never dropped. This is how Bob validates "match all" is real, not claimed.
+
+## 4. The Cube schema (`cube` on MyDB)
+
+- `cube.trades` — one row per matched round-trip: `instrument_type, underlying, symbol, side,
+  structure_type, strategy, dte_bucket, broker, account, opened_at, closed_at, qty, open_cash,
+  close_cash, realized_pnl, fees, expired/assigned flags`, **+ provenance** (`open_source_ids[]`,
+  `close_source_ids[]` — reference the source txns, never copy).
+- `cube.trade_legs` — the leg detail behind each trade (lineage to source fills).
+- `cube.cash_flows` — unified fact: bank/card `v_transactions` **∪** broker Money Movement (deposits,
+  interest, fees, div) — the money-in/out layer, provenance-linked.
+- `cube.holdings_income` — the ETF sleeve (basis + dividends) wrapped as a fact.
+- **Dimensions** (shared join keys): `symbol · underlying · strategy · structure_type · dte_bucket ·
+  side · instrument_type · broker · account · period · category`.
+- `cube.match_runs` — scorecard per batch run (matched/unmatched counts, for trust + drift detection).
+
+## 5. PFM serving layer
+
+- **Read-models** (`src/lib/db/read-models/cube.ts`): Drizzle `.existing()` over `cube.trades`,
+  `cube.cash_flows`, `cube.holdings_income`, `cube.match_runs` — typed, RO (same pattern as today).
+- **tRPC** (`routers/cube.ts`): `trades(filter)`, `tradePerformance(groupBy)`, `matchHealth()`,
+  `slice(dims)` — the sliceable read functions.
+- **Explorer views**: a **Trades register** (Quicken-style, sliceable by symbol/strategy/DTE/broker/
+  instrument), a **Performance** view (P&L by any dimension), a **Match Health** panel (the scorecard).
+  Reuse the existing register/table primitives.
+
+## 6. Provenance, lineage, truth (non-negotiable)
+
+- **Provenance in the sources; the Cube is the convergence.** Cube facts *reference* source txn ids;
+  never copy the source row (same law as PFM's `TransactionCategory`).
+- **Leftovers are visible**, always — an unmatched fill is a data-truth signal, surfaced in Match
+  Health, never silently dropped. Truth at the core.
+- **Decimal everywhere** (money never float — lifted straight from the engine's discipline).
+
+## 7. Phased path & what THIS run delivers
+
+- **Phase 1 (this run, autonomous):** the generalized engine (equity/future/option/future-option
+  adapters + multi-day FIFO + expiry/assignment) + `cube.trades`/`trade_legs` landing + the
+  **match-rate scorecard** run against the real 2020–2026 data. Deliver honest match rates by
+  instrument; surface `Leftover`s. *This is the white whale, generalized — the hard, unique part.*
+- **Phase 2:** structure grouper (strategies), Schwab equity/ETF adapters completeness, multi-year
+  Schwab back-history.
+- **Phase 3:** `cube.cash_flows` unified fact (fold broker Money Movement into PFM's existing cash flow).
+- **Phase 4:** `cube.holdings_income` (ETF sleeve).
+- **Phase 5:** PFM serving — read-models + tRPC + Explorer Trades/Performance/Match-Health views.
+- **Phase 6 (the endgame Bob has shipped before):** NL-query agent over the financial graph
+  (his Devon IAM-graph playbook, pointed at his money) + graph-data-science anomaly detection
+  (miscategorized txns, duplicates, orphaned legs, reconciliation gaps — "where the data is lying").
+
+## 8. Honest scope note
+
+"Match all across 6 years of mixed broker activity" is genuinely iterative — little jarvis got 100%
+on 0-DTE *with validation loops against real fills*. This run builds the generalized engine and runs
+it against the real data to produce the **first honest match-rate scorecard**; the leftover cases it
+surfaces are the tuning worklist (assignment edge cases, roll detection, Schwab leg quirks). Nothing
+is claimed matched that isn't — the scorecard is the truth.
+
+## 9. Decisions (made; veto anything)
+
+- **Bridge:** Python engine-as-batch (not a TS port). ✅
+- **Facts live in:** a `cube` schema on MyDB, RO to `pfm`. ✅
+- **Matcher granularity:** **leg-level FIFO** (always matches) + structure grouping as an additive
+  dimension (never lose a fill to an ambiguous structure). ✅
+- **Where the engine code lives:** extend it in `0-dte-optimizer` (its home, proven, bind-mounted for
+  batch) under a new `zerodte.cube` package — or a shared lib. ⟡ *leaning: extend in place.*
+
+*Principles: provenance in the sources · leverage what's built · value early · truth at the core · one
+brain, many instruments.*
