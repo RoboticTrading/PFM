@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { CategoryTree } from "@/components/cube/CategoryTree";
 import { EquityCurve } from "@/components/cube/EquityCurve";
 import { GainLossChart } from "@/components/cube/GainLossChart";
+import { HousePanel } from "@/components/cube/HousePanel";
 import { StrategyHud } from "@/components/cube/StrategyHud";
 import { formatUsd } from "@/lib/money";
 import { trpc } from "@/lib/trpc/client";
@@ -420,6 +421,9 @@ export function Cube() {
           </table>
         )}
       </section>
+
+      {/* the house — real estate as a marked-to-market asset (Bob's BolivarDr model) */}
+      <HousePanel />
         </>
       )}
     </main>

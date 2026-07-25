@@ -114,6 +114,36 @@ export const cubeMarks = cube.table("marks", {
   source: text("source"),
 });
 
+/** A tracked real-estate asset — the home (address + purchase basis Bob seeded). */
+export const cubeProperty = cube.table("property", {
+  propertyKey: text("property_key"),
+  label: text("label"),
+  address: text("address"),
+  purchasePrice: numeric("purchase_price"),
+  purchaseDate: date("purchase_date"),
+  active: text("active"),
+});
+
+/** The house daily equity series — value (zEstimate/AVM) vs adjusted cost vs diff (Bob's chart). */
+export const cubePropertyDaily = cube.table("property_daily", {
+  propertyKey: text("property_key"),
+  d: date("d"),
+  value: numeric("value"),
+  adjustedCost: numeric("adjusted_cost"),
+  diff: numeric("diff"),
+});
+
+/** The house basis footprints — expenses inflate, rent deflates (the category→basis-effect ledger). */
+export const cubePropertyLedger = cube.table("property_ledger", {
+  ledgerId: bigint("ledger_id", { mode: "number" }),
+  propertyKey: text("property_key"),
+  d: date("d"),
+  category: text("category"),
+  amount: numeric("amount"),
+  description: text("description"),
+  effect: text("effect"),
+});
+
 /** Live open futures/equity positions (net-inventory, expiry-filtered), marked to market. */
 export const cubeOpenPositions = cube.table("open_positions", {
   symbol: text("symbol"),

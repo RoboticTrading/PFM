@@ -9,6 +9,9 @@ import {
   cubeMatchHealth,
   cubeOpenPositionsList,
   cubePerformance,
+  cubePropertyDailySeries,
+  cubePropertyLedgerByCategory,
+  cubePropertyList,
   cubeStrategyPerformance,
   cubeStructuresList,
   cubeSummary,
@@ -66,6 +69,19 @@ export const cubeRouter = router({
   etfDaily: publicProcedure
     .input(z.object({ symbol: z.string() }))
     .query(({ input }) => cubeEtfDailySeries(input.symbol)),
+
+  /** Tracked real-estate assets — the home(s) with latest value / adjusted cost / equity. */
+  properties: publicProcedure.query(() => cubePropertyList()),
+
+  /** One property's daily value-vs-cost-vs-diff series (Bob's BolivarDr chart, live). */
+  propertyDaily: publicProcedure
+    .input(z.object({ propertyKey: z.string() }))
+    .query(({ input }) => cubePropertyDailySeries(input.propertyKey)),
+
+  /** One property's basis footprints by category (what's inflating/deflating the basis). */
+  propertyLedger: publicProcedure
+    .input(z.object({ propertyKey: z.string() }))
+    .query(({ input }) => cubePropertyLedgerByCategory(input.propertyKey)),
 
   /** Broker money movement by category — deposits, interest, fees, dividends. */
   cashFlow: publicProcedure.query(() => cubeCashFlowByCategory()),

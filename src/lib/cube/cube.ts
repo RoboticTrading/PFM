@@ -8,6 +8,9 @@ import {
   cubeEtfDaily,
   cubeMatchRuns,
   cubeOpenPositions,
+  cubeProperty,
+  cubePropertyDaily,
+  cubePropertyLedger,
   cubeStructures,
   cubeTrades,
 } from "@/lib/db/read-models/cube";
@@ -362,6 +365,81 @@ export async function cubeCategoryTree(): Promise<CategoryNode[]> {
       .groupBy(cubeCashFlows.rollup, cubeCashFlows.category),
   ]);
   return [...trading, ...flows].filter((r) => r.path) as CategoryNode[];
+}
+
+// ─── Real estate: the house as a marked-to-market asset (Bob's BolivarDr model) ────────
+
+export interface PropertyRow {
+  propertyKey: string;
+  label: string;
+  address: string;
+  value: string | null;
+  adjustedCost: string | null;
+  diff: string | null;
+  asOf: string | null;
+}
+
+/** The tracked properties with their latest value / adjusted cost / equity diff. */
+export async function cubePropertyList(): Promise<PropertyRow[]> {
+  return getDb()
+    .select({
+      propertyKey: cubeProperty.propertyKey,
+      label: sql<string>`coalesce(${cubeProperty.label},'—')`,
+      address: sql<string>`coalesce(${cubeProperty.address},'')`,
+      value: sql<string | null>`round((SELECT pd.value FROM cube.property_daily pd
+        WHERE pd.property_key = ${cubeProperty.propertyKey} ORDER BY pd.d DESC LIMIT 1)::numeric,2)::text`,
+      adjustedCost: sql<string | null>`round((SELECT pd.adjusted_cost FROM cube.property_daily pd
+        WHERE pd.property_key = ${cubeProperty.propertyKey} ORDER BY pd.d DESC LIMIT 1)::numeric,2)::text`,
+      diff: sql<string | null>`round((SELECT pd.diff FROM cube.property_daily pd
+        WHERE pd.property_key = ${cubeProperty.propertyKey} ORDER BY pd.d DESC LIMIT 1)::numeric,2)::text`,
+      asOf: sql<string | null>`(SELECT pd.d FROM cube.property_daily pd
+        WHERE pd.property_key = ${cubeProperty.propertyKey} ORDER BY pd.d DESC LIMIT 1)::text`,
+    })
+    .from(cubeProperty)
+    .where(sql`${cubeProperty.active} IS NULL OR ${cubeProperty.active}::bool`) as Promise<PropertyRow[]>;
+}
+
+export interface PropertyDailyPoint {
+  d: string;
+  value: number | null;
+  adjustedCost: number;
+  diff: number | null;
+}
+
+/** The house daily series — value vs adjusted cost vs diff, for the chart. */
+export async function cubePropertyDailySeries(propertyKey: string): Promise<PropertyDailyPoint[]> {
+  return getDb()
+    .select({
+      d: sql<string>`${cubePropertyDaily.d}::text`,
+      value: sql<number | null>`${cubePropertyDaily.value}::float8`,
+      adjustedCost: sql<number>`${cubePropertyDaily.adjustedCost}::float8`,
+      diff: sql<number | null>`${cubePropertyDaily.diff}::float8`,
+    })
+    .from(cubePropertyDaily)
+    .where(eq(cubePropertyDaily.propertyKey, propertyKey))
+    .orderBy(cubePropertyDaily.d) as Promise<PropertyDailyPoint[]>;
+}
+
+export interface PropertyLedgerCategory {
+  category: string;
+  effect: string;
+  total: string;
+  n: number;
+}
+
+/** The basis footprints grouped by category — what's inflating/deflating the house basis. */
+export async function cubePropertyLedgerByCategory(propertyKey: string): Promise<PropertyLedgerCategory[]> {
+  return getDb()
+    .select({
+      category: sql<string>`coalesce(${cubePropertyLedger.category},'—')`,
+      effect: sql<string>`max(${cubePropertyLedger.effect})`,
+      total: sql<string>`round(sum(${cubePropertyLedger.amount})::numeric,2)::text`,
+      n: sql<number>`count(*)::int`,
+    })
+    .from(cubePropertyLedger)
+    .where(eq(cubePropertyLedger.propertyKey, propertyKey))
+    .groupBy(cubePropertyLedger.category)
+    .orderBy(desc(sql`abs(sum(${cubePropertyLedger.amount}))`)) as Promise<PropertyLedgerCategory[]>;
 }
 
 export interface EtfDailyPoint {
