@@ -161,17 +161,19 @@ async function flowRows(range: DateRange): Promise<FlowRow[]> {
       ),
     db
       .select({
-        date: sql<string>`${cubeStructures.closedAt}::date::text`,
+        // Realized date = when it closed, or (for a worthless expiry, closed_at IS NULL) its
+        // open/expiry day. Expiry winners keep the full credit; without this coalesce they'd fall
+        // out of every date-windowed report.
+        date: sql<string>`coalesce(${cubeStructures.closedAt}, ${cubeStructures.openedAt})::date::text`,
         amount: sql<string>`${cubeStructures.realizedPnl}::text`,
         path: sql<string>`coalesce(${cubeStructures.category}, 'Income / Trading / Other')`,
       })
       .from(cubeStructures)
       .where(
         and(
-          isNotNull(cubeStructures.closedAt),
           isNotNull(cubeStructures.realizedPnl),
-          sql`${cubeStructures.closedAt}::date >= ${range.from}`,
-          sql`${cubeStructures.closedAt}::date <= ${range.to}`,
+          sql`coalesce(${cubeStructures.closedAt}, ${cubeStructures.openedAt})::date >= ${range.from}`,
+          sql`coalesce(${cubeStructures.closedAt}, ${cubeStructures.openedAt})::date <= ${range.to}`,
         ),
       ),
   ]);
