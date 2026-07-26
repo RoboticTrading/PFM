@@ -1,5 +1,7 @@
 "use client";
 
+import type { Ref } from "react";
+
 import { Input } from "@/components/ui/input";
 import { SPLIT_CATEGORY } from "@/lib/accounts/register-types";
 import { trpc } from "@/lib/trpc/client";
@@ -26,6 +28,7 @@ export function TxnFilterBar({
   showing,
   total,
   defaults = EMPTY_FACETS,
+  searchRef,
 }: {
   facets: TxnFacets;
   onChange: (next: TxnFacets) => void;
@@ -33,6 +36,8 @@ export function TxnFilterBar({
   total: number;
   /** The "home" filter Reset returns to (and the baseline for the dirty flag). */
   defaults?: TxnFacets;
+  /** Ref to the search input, so the workspace can refocus it after an apply. */
+  searchRef?: Ref<HTMLInputElement>;
 }) {
   const categories = trpc.categories.list.useQuery();
   const set = (patch: Partial<TxnFacets>) => onChange({ ...facets, ...patch });
@@ -41,6 +46,7 @@ export function TxnFilterBar({
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
       <Input
+        ref={searchRef}
         aria-label="Search description"
         placeholder="Search…"
         value={facets.query}

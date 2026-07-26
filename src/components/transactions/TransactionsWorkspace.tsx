@@ -1,7 +1,7 @@
 "use client";
 
 import { keepPreviousData } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { CategoryPicker } from "@/components/categories/CategoryPicker";
 import { ALL_ACCOUNTS } from "@/lib/accounts/register-types";
@@ -94,6 +94,10 @@ export function TransactionsWorkspace() {
     return () => clearTimeout(id);
   }, [flash]);
 
+  // The search box, so an apply can clear it and refocus — landing ready for the
+  // next merchant filter without clobbering the date window or the Uncategorized
+  // scope (those persist across batches; only the per-merchant search resets).
+  const searchRef = useRef<HTMLInputElement>(null);
   const bulk = trpc.categories.categorizeBulk.useMutation({
     onSuccess: (_res, vars) => {
       const name =
@@ -103,6 +107,8 @@ export function TransactionsWorkspace() {
       invalidateRegister();
       setSelected(new Set());
       setBulkCategory(null);
+      setFacets((f) => ({ ...f, query: "" }));
+      requestAnimationFrame(() => searchRef.current?.focus());
     },
   });
 
@@ -245,6 +251,7 @@ export function TransactionsWorkspace() {
           showing={rows.length}
           total={total}
           defaults={DEFAULT_FACETS}
+          searchRef={searchRef}
         />
         {register.isLoading ? (
           <p className="p-4 text-sm text-fg-muted">Loading transactions…</p>
