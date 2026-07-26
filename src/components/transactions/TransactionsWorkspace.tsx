@@ -9,7 +9,7 @@ import { formatUsd } from "@/lib/money";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 
-import { EMPTY_FACETS, type TxnFacets } from "./filter";
+import { DEFAULT_FACETS, type TxnFacets } from "./filter";
 import { SplitDialog, type SplitTarget } from "./SplitDialog";
 import { TxnFilterBar } from "./TxnFilterBar";
 
@@ -41,7 +41,8 @@ export function TransactionsWorkspace() {
   }, [accountId, accounts.data]);
 
   const categories = trpc.categories.list.useQuery();
-  const [facets, setFacets] = useState<TxnFacets>(EMPTY_FACETS);
+  // Open on the burn-down — only what's still uncategorized (DEFAULT_FACETS).
+  const [facets, setFacets] = useState<TxnFacets>(DEFAULT_FACETS);
   const [offset, setOffset] = useState(0);
 
   const register = trpc.transactions.page.useQuery(
@@ -82,8 +83,23 @@ export function TransactionsWorkspace() {
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkCategory, setBulkCategory] = useState<string | null>(null);
+  // A transient "✓ N categorized as X" confirmation after a bulk apply. Needed
+  // because a successful apply clears the selection (unmounting the bulk bar) and
+  // — on the default uncategorized view — drops the rows out, so without this the
+  // action can feel like it did nothing.
+  const [flash, setFlash] = useState<string | null>(null);
+  useEffect(() => {
+    if (!flash) return;
+    const id = setTimeout(() => setFlash(null), 3500);
+    return () => clearTimeout(id);
+  }, [flash]);
+
   const bulk = trpc.categories.categorizeBulk.useMutation({
-    onSuccess: () => {
+    onSuccess: (_res, vars) => {
+      const name =
+        categories.data?.find((c) => c.id === vars.categoryId)?.name ??
+        "category";
+      setFlash(`✓ ${vars.txns.length} categorized as ${name}`);
       invalidateRegister();
       setSelected(new Set());
       setBulkCategory(null);
@@ -181,6 +197,15 @@ export function TransactionsWorkspace() {
         </label>
       </header>
 
+      {flash && (
+        <div
+          role="status"
+          className="mb-3 rounded-md border border-accent/40 bg-accent/10 px-3 py-2 text-sm font-medium text-accent-bright"
+        >
+          {flash}
+        </div>
+      )}
+
       {selectedVisible.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-3 rounded-md border border-border bg-card p-3">
           <span className="text-sm font-medium text-fg">
@@ -219,15 +244,25 @@ export function TransactionsWorkspace() {
           onChange={setFacets}
           showing={rows.length}
           total={total}
+          defaults={DEFAULT_FACETS}
         />
         {register.isLoading ? (
           <p className="p-4 text-sm text-fg-muted">Loading transactions…</p>
         ) : register.isError ? (
           <p className="p-4 text-sm text-danger">Failed to load transactions.</p>
         ) : rows.length === 0 ? (
-          <p className="p-4 text-sm text-fg-muted">
-            No transactions match these filters.
-          </p>
+          uncategorizedActive ? (
+            <p className="p-4 text-sm text-accent-bright">
+              ✓ All caught up — nothing uncategorized
+              {facets.query || facets.from || facets.to || facets.direction !== "all"
+                ? " in this filter."
+                : "."}
+            </p>
+          ) : (
+            <p className="p-4 text-sm text-fg-muted">
+              No transactions match these filters.
+            </p>
+          )
         ) : (
           <table className="w-full text-sm">
             <thead>

@@ -24,6 +24,17 @@ export const EMPTY_FACETS: TxnFacets = {
   category: "all",
 };
 
+/**
+ * The categorize workspace's home filter: open straight onto the burn-down —
+ * only what's still uncategorized. Distinct from {@link EMPTY_FACETS} (the
+ * neutral "show everything" used for cleared state + the account register), so
+ * "Reset" on the categorize page returns to the uncategorized backlog, not all.
+ */
+export const DEFAULT_FACETS: TxnFacets = {
+  ...EMPTY_FACETS,
+  category: "uncategorized",
+};
+
 /** Pure, allocation-light facet filter over register rows. Unit-testable. */
 export function filterTransactions(
   rows: readonly RegisterTxn[],

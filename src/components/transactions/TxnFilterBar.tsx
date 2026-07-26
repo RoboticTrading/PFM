@@ -25,15 +25,18 @@ export function TxnFilterBar({
   onChange,
   showing,
   total,
+  defaults = EMPTY_FACETS,
 }: {
   facets: TxnFacets;
   onChange: (next: TxnFacets) => void;
   showing: number;
   total: number;
+  /** The "home" filter Reset returns to (and the baseline for the dirty flag). */
+  defaults?: TxnFacets;
 }) {
   const categories = trpc.categories.list.useQuery();
   const set = (patch: Partial<TxnFacets>) => onChange({ ...facets, ...patch });
-  const dirty = JSON.stringify(facets) !== JSON.stringify(EMPTY_FACETS);
+  const dirty = JSON.stringify(facets) !== JSON.stringify(defaults);
 
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
@@ -96,7 +99,7 @@ export function TxnFilterBar({
         {dirty && (
           <button
             type="button"
-            onClick={() => onChange(EMPTY_FACETS)}
+            onClick={() => onChange(defaults)}
             className="text-accent hover:text-accent-bright"
           >
             Reset
