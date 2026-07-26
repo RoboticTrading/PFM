@@ -228,3 +228,69 @@ export async function registerPage(q: RegisterQuery): Promise<RegisterPage> {
     uncategorized: uncatRes[0]?.value ?? 0,
   };
 }
+
+// --- Select-all-matching (whole-filter bulk categorize) -------------------
+
+/**
+ * Safety ceiling for one "select all matching" gather — far above any real
+ * single-merchant filter, so an over-broad filter can't silently queue an
+ * unbounded mass-assign. If the match count exceeds this, the caller is told
+ * (`capped`) so it can ask the user to narrow the filter.
+ */
+const MAX_MATCHING = 5000;
+
+/** A ledger row's write-ref — the lineage key + date + amount a categorize needs. */
+export interface TxnRef {
+  sourceSchema: string;
+  sourceTxnId: string;
+  txnDate: string;
+  amount: string;
+}
+
+/** All write-refs matching a filter, plus the true `total` and whether the ceiling truncated it. */
+export interface MatchingRefs {
+  refs: TxnRef[];
+  total: number;
+  capped: boolean;
+}
+
+/**
+ * Every write-ref matching a filter — powers "select all N matching this filter"
+ * bulk categorization. Runs the SAME conditions as {@link registerPage} (so the
+ * gathered set is exactly what the register shows), but returns ALL matches with
+ * NO pagination — just the lineage keys the bulk categorize needs — up to
+ * {@link MAX_MATCHING}. This is the escape hatch from per-page selection: the
+ * filter itself is the scope, so applying to the whole set is safe and explicit.
+ */
+export async function matchingRefs(q: RegisterQuery): Promise<MatchingRefs> {
+  const db = getDb();
+  const base = baseConditions(q);
+  const catCond = categoryCondition(q.category);
+
+  const [refRows, totalRes] = await Promise.all([
+    db
+      .select({
+        sourceSchema: cubeVLedger.sourceSchema,
+        sourceTxnId: cubeVLedger.sourceTxnId,
+        txnDate: cubeVLedger.txnDate,
+        amount: cubeVLedger.amount,
+      })
+      .from(cubeVLedger)
+      .where(and(...base, catCond))
+      .orderBy(desc(cubeVLedger.txnDate), desc(cubeVLedger.sourceTxnId))
+      .limit(MAX_MATCHING),
+    db.select({ value: count() }).from(cubeVLedger).where(and(...base, catCond)),
+  ]);
+
+  const total = totalRes[0]?.value ?? 0;
+  return {
+    refs: refRows.map((r) => ({
+      sourceSchema: r.sourceSchema ?? "",
+      sourceTxnId: String(r.sourceTxnId ?? ""),
+      txnDate: (r.txnDate ?? "").slice(0, 10),
+      amount: r.amount ?? "0",
+    })),
+    total,
+    capped: total > MAX_MATCHING,
+  };
+}

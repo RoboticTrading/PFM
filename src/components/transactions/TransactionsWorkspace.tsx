@@ -45,17 +45,19 @@ export function TransactionsWorkspace() {
   const [facets, setFacets] = useState<TxnFacets>(DEFAULT_FACETS);
   const [offset, setOffset] = useState(0);
 
+  // The facet filter as the server query shape — shared by the paged register and
+  // the "select all matching" ref-gather, so the two can never drift apart.
+  const queryInput = {
+    accountId,
+    category: facets.category,
+    query: facets.query,
+    direction: facets.direction,
+    from: facets.from,
+    to: facets.to,
+  };
+
   const register = trpc.transactions.page.useQuery(
-    {
-      accountId,
-      category: facets.category,
-      query: facets.query,
-      direction: facets.direction,
-      from: facets.from,
-      to: facets.to,
-      limit: PAGE_SIZE,
-      offset,
-    },
+    { ...queryInput, limit: PAGE_SIZE, offset },
     { enabled: accountId !== "", placeholderData: keepPreviousData },
   );
 
@@ -98,19 +100,12 @@ export function TransactionsWorkspace() {
   // next merchant filter without clobbering the date window or the Uncategorized
   // scope (those persist across batches; only the per-merchant search resets).
   const searchRef = useRef<HTMLInputElement>(null);
-  const bulk = trpc.categories.categorizeBulk.useMutation({
-    onSuccess: (_res, vars) => {
-      const name =
-        categories.data?.find((c) => c.id === vars.categoryId)?.name ??
-        "category";
-      setFlash(`✓ ${vars.txns.length} categorized as ${name}`);
-      invalidateRegister();
-      setSelected(new Set());
-      setBulkCategory(null);
-      setFacets((f) => ({ ...f, query: "" }));
-      requestAnimationFrame(() => searchRef.current?.focus());
-    },
-  });
+  // "Select all N matching this filter" — the escape hatch from per-page (≤200)
+  // selection. The filter is the scope, so applying to the whole matching set is
+  // explicit and safe; refs are gathered server-side, not from the loaded page.
+  const [selectAllMatching, setSelectAllMatching] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const bulk = trpc.categories.categorizeBulk.useMutation();
 
   const keyOf = (t: { sourceSchema: string; sourceTxnId: string }) =>
     `${t.sourceSchema}:${t.sourceTxnId}`;
@@ -122,7 +117,17 @@ export function TransactionsWorkspace() {
     [selected, visibleKeys],
   );
 
+  // A new filter/account invalidates any prior selection and the all-matching scope.
+  useEffect(() => {
+    setSelected(new Set());
+    setSelectAllMatching(false);
+  }, [accountId, facets]);
+
+  // How many rows the pending apply will hit.
+  const applyCount = selectAllMatching ? total : selectedVisible.length;
+
   function toggleRow(key: string) {
+    setSelectAllMatching(false);
     setSelected((s) => {
       const next = new Set(s);
       if (next.has(key)) next.delete(key);
@@ -131,18 +136,61 @@ export function TransactionsWorkspace() {
     });
   }
 
-  function applyBulk() {
-    if (!bulkCategory) return;
-    const chosen = new Set(selectedVisible);
-    const txns = rows
-      .filter((t) => chosen.has(keyOf(t)))
-      .map((t) => ({
-        sourceSchema: t.sourceSchema,
-        sourceTxnId: t.sourceTxnId,
-        txnDate: t.date.slice(0, 10),
-        amount: t.amount,
-      }));
-    if (txns.length > 0) bulk.mutate({ categoryId: bulkCategory, txns });
+  async function applyBulk() {
+    if (!bulkCategory || applying) return;
+    const categoryId = bulkCategory;
+    const name =
+      categories.data?.find((c) => c.id === categoryId)?.name ?? "category";
+
+    // Gather targets: the WHOLE matching filter (server-side), or just the page
+    // selection. Either way, hand plain write-refs to categorizeBulk.
+    let refs: {
+      sourceSchema: string;
+      sourceTxnId: string;
+      txnDate: string;
+      amount: string;
+    }[];
+    let capped = false;
+    if (selectAllMatching) {
+      const res = await utils.transactions.matchingRefs.fetch(queryInput);
+      refs = res.refs;
+      capped = res.capped;
+    } else {
+      const chosen = new Set(selectedVisible);
+      refs = rows
+        .filter((t) => chosen.has(keyOf(t)))
+        .map((t) => ({
+          sourceSchema: t.sourceSchema,
+          sourceTxnId: t.sourceTxnId,
+          txnDate: t.date.slice(0, 10),
+          amount: t.amount,
+        }));
+    }
+    if (refs.length === 0) return;
+
+    // categorizeBulk caps at 1000/call — chunk a larger "select all" set.
+    setApplying(true);
+    try {
+      const CHUNK = 1000;
+      for (let i = 0; i < refs.length; i += CHUNK) {
+        await bulk.mutateAsync({ categoryId, txns: refs.slice(i, i + CHUNK) });
+      }
+    } catch {
+      setApplying(false);
+      return; // leave the selection intact so the user can retry
+    }
+    setApplying(false);
+
+    setFlash(
+      `✓ ${refs.length} categorized as ${name}` +
+        (capped ? " · filter ceiling hit — narrow it for the rest" : ""),
+    );
+    invalidateRegister();
+    setSelected(new Set());
+    setSelectAllMatching(false);
+    setBulkCategory(null);
+    setFacets((f) => ({ ...f, query: "" }));
+    requestAnimationFrame(() => searchRef.current?.focus());
   }
 
   const pickerCats = categories.data ?? [];
@@ -212,11 +260,38 @@ export function TransactionsWorkspace() {
         </div>
       )}
 
-      {selectedVisible.length > 0 && (
+      {(selectedVisible.length > 0 || selectAllMatching) && (
         <div className="mb-3 flex flex-wrap items-center gap-3 rounded-md border border-border bg-card p-3">
           <span className="text-sm font-medium text-fg">
-            {selectedVisible.length} selected
+            {selectAllMatching
+              ? `All ${total} matching selected`
+              : `${selectedVisible.length} selected`}
           </span>
+
+          {/* Escape hatch from the per-page cap: grab every match, not just the
+              visible page. Offered whenever the filter has more than one page. */}
+          {!selectAllMatching && total > rows.length && (
+            <button
+              type="button"
+              onClick={() => setSelectAllMatching(true)}
+              className="text-sm text-accent outline-none hover:text-accent-bright focus-visible:underline"
+            >
+              Select all {total} matching this filter
+            </button>
+          )}
+          {selectAllMatching && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectAllMatching(false);
+                setSelected(new Set());
+              }}
+              className="text-sm text-fg-muted outline-none hover:text-fg"
+            >
+              select page only
+            </button>
+          )}
+
           <div className="w-64">
             <CategoryPicker
               categories={pickerCats}
@@ -229,14 +304,17 @@ export function TransactionsWorkspace() {
           <button
             type="button"
             onClick={applyBulk}
-            disabled={!bulkCategory || bulk.isPending}
+            disabled={!bulkCategory || applying || applyCount === 0}
             className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground outline-none transition-colors hover:bg-accent-bright disabled:opacity-40"
           >
-            {bulk.isPending ? "Applying…" : `Apply to ${selectedVisible.length}`}
+            {applying ? "Applying…" : `Apply to ${applyCount}`}
           </button>
           <button
             type="button"
-            onClick={() => setSelected(new Set())}
+            onClick={() => {
+              setSelected(new Set());
+              setSelectAllMatching(false);
+            }}
             className="text-sm text-fg-muted outline-none hover:text-fg"
           >
             Clear
@@ -280,16 +358,18 @@ export function TransactionsWorkspace() {
                     aria-label="Select all on page"
                     title="Select all on this page"
                     checked={
-                      rows.length > 0 &&
-                      selectedVisible.length === rows.length
+                      selectAllMatching ||
+                      (rows.length > 0 &&
+                        selectedVisible.length === rows.length)
                     }
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      setSelectAllMatching(false);
                       setSelected(
                         e.target.checked
                           ? new Set(rows.map(keyOf))
                           : new Set(),
-                      )
-                    }
+                      );
+                    }}
                   />
                 </th>
                 <th className="px-3 py-2 text-left font-medium">Date</th>
@@ -394,7 +474,7 @@ export function TransactionsWorkspace() {
           </div>
         )}
       </div>
-      {categorize.isError && (
+      {(categorize.isError || bulk.isError) && (
         <p className="mt-3 text-sm text-danger">
           Couldn&rsquo;t save that categorization — try again.
         </p>

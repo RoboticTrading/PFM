@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { accountRegister, registerPage } from "@/lib/accounts/register";
+import {
+  accountRegister,
+  matchingRefs,
+  registerPage,
+} from "@/lib/accounts/register";
 import { ALL_ACCOUNTS } from "@/lib/accounts/register-types";
 
 import { publicProcedure, router } from "../trpc";
@@ -58,6 +62,35 @@ export const transactionsRouter = router({
         to: input.to || undefined,
         limit: input.limit,
         offset: input.offset,
+      }),
+    ),
+
+  /**
+   * Every write-ref matching a filter (no pagination) — the "select all N
+   * matching this filter" escape hatch from per-page selection. Same facets as
+   * {@link page}, so the gathered set is exactly what the register shows. Returns
+   * `{ refs, total, capped }`; the client hands the refs to `categorizeBulk`.
+   */
+  matchingRefs: publicProcedure
+    .input(
+      z.object({
+        accountId: z.string().min(1),
+        category: z.string().default("all"),
+        query: z.string().default(""),
+        direction: z.enum(["all", "in", "out"]).default("all"),
+        from: z.string().default(""),
+        to: z.string().default(""),
+      }),
+    )
+    .query(({ input }) =>
+      matchingRefs({
+        accountKey:
+          input.accountId === ALL_ACCOUNTS ? undefined : input.accountId,
+        category: input.category,
+        query: input.query,
+        direction: input.direction,
+        from: input.from || undefined,
+        to: input.to || undefined,
       }),
     ),
 });
