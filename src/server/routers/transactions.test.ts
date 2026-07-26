@@ -88,10 +88,15 @@ describeDb("transactions.forAccount (live MyDB, cube.v_ledger)", () => {
       expect(after.uncategorized).toBe(before.uncategorized - 1);
 
       // … and it now surfaces under the "categorized" filter (same lineage key).
+      // Pin the window to the target's own date so this can't fall out of a
+      // newest-N page as the overall categorized volume grows.
+      const day = target.date.slice(0, 10);
       const categorized = await call.transactions.page({
         accountId: ALL_ACCOUNTS,
         category: "categorized",
-        limit: 50,
+        from: day,
+        to: day,
+        limit: 500,
       });
       expect(categorized.rows.some((r) => keyOf(r) === key)).toBe(true);
     } finally {
