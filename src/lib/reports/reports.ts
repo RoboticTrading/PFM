@@ -202,37 +202,35 @@ function byMagnitudeDesc(a: { total: string }, b: { total: string }): number {
   return aa > bb ? -1 : aa < bb ? 1 : 0;
 }
 
-export interface PeriodFlow {
-  key: string;
+/** One statement line — a category (or subtotal) with its per-period cells + row sum. */
+export interface MatrixRow {
   label: string;
-  income: string;
-  expense: string;
-  /** income + expense (expense is negative). */
-  net: string;
-}
-
-export interface BreakdownRow {
-  label: string;
-  kind: "Income" | "Expense";
+  /** Amount in each period, aligned index-for-index to `periods`. */
+  byPeriod: string[];
+  /** Row sum across every period. */
   total: string;
 }
 
 export interface IncomeStatement {
   range: DateRange;
   grain: Grain;
-  /** One row per period column — the time series. */
-  series: PeriodFlow[];
-  /** Income lines over the whole range, biggest first (incl. bridged Trading). */
-  income: BreakdownRow[];
-  /** Expense lines over the whole range, biggest magnitude first. */
-  expense: BreakdownRow[];
-  totals: { income: string; expense: string; net: string };
+  /** The column headers — one per period, left→right. */
+  periods: { key: string; label: string }[];
+  /** Income line items (rows), biggest first — incl. bridged Trading. */
+  income: MatrixRow[];
+  /** Expense line items (rows), biggest magnitude first. */
+  expense: MatrixRow[];
+  /** Section subtotal + net rows (each a full per-period vector + total). */
+  incomeTotal: MatrixRow;
+  expenseTotal: MatrixRow;
+  net: MatrixRow;
 }
 
 /**
- * The Income/Expense (P&L) report: per-period income/expense/net, plus a
- * category breakdown over the whole range. Trading realized P&L is folded into
- * Income (labeled "Trading · <asset class>"). Transfers are excluded.
+ * The Income/Expense (P&L) statement in the TRADITIONAL shape: line items down
+ * the rows, periods across the columns, a row sum, and section-subtotal + net
+ * rows — a pivot, not a transposed series. Trading realized P&L is folded into
+ * Income (labeled "Trading · <asset class>"); Transfers are excluded.
  */
 export async function incomeStatement(
   range: DateRange,
@@ -240,63 +238,61 @@ export async function incomeStatement(
 ): Promise<IncomeStatement> {
   const rows = await flowRows(range);
   const periods = buildPeriods(range, grain);
+  const nP = periods.length;
 
-  const incByP: string[][] = periods.map(() => []);
-  const expByP: string[][] = periods.map(() => []);
-  const incByLabel = new Map<string, string[]>();
-  const expByLabel = new Map<string, string[]>();
+  // label → per-period buckets of amounts (the matrix cells)
+  const incCells = new Map<string, string[][]>();
+  const expCells = new Map<string, string[][]>();
+  const freshCells = () => Array.from({ length: nP }, () => [] as string[]);
 
   for (const r of rows) {
-    const bucket = r.kind === "Income" ? incByLabel : expByLabel;
-    const list = bucket.get(r.label) ?? [];
-    list.push(r.amount);
-    bucket.set(r.label, list);
-
     const i = periodIndexOf(periods, r.date);
     if (i < 0) continue;
-    (r.kind === "Income" ? incByP : expByP)[i].push(r.amount);
+    const m = r.kind === "Income" ? incCells : expCells;
+    let cells = m.get(r.label);
+    if (!cells) {
+      cells = freshCells();
+      m.set(r.label, cells);
+    }
+    cells[i].push(r.amount);
   }
 
-  const series: PeriodFlow[] = periods.map((p, i) => {
-    const income = sumMoney(incByP[i]);
-    const expense = sumMoney(expByP[i]);
-    return {
-      key: p.key,
-      label: p.label,
-      income,
-      expense,
-      net: addMoney(income, expense),
-    };
+  const toRow = (label: string, cells: string[][]): MatrixRow => {
+    const byPeriod = cells.map((c) => sumMoney(c));
+    return { label, byPeriod, total: sumMoney(byPeriod) };
+  };
+  const income = [...incCells.entries()]
+    .map(([l, c]) => toRow(l, c))
+    .sort(byMagnitudeDesc);
+  const expense = [...expCells.entries()]
+    .map(([l, c]) => toRow(l, c))
+    .sort(byMagnitudeDesc);
+
+  // A column-wise subtotal across a set of rows (per-period + grand total).
+  const subtotal = (label: string, set: MatrixRow[]): MatrixRow => ({
+    label,
+    byPeriod: periods.map((_, i) => sumMoney(set.map((r) => r.byPeriod[i]))),
+    total: sumMoney(set.map((r) => r.total)),
   });
+  const incomeTotal = subtotal("Total income", income);
+  const expenseTotal = subtotal("Total expenses", expense);
+  const net: MatrixRow = {
+    label: "Net",
+    byPeriod: periods.map((_, i) =>
+      addMoney(incomeTotal.byPeriod[i], expenseTotal.byPeriod[i]),
+    ),
+    total: addMoney(incomeTotal.total, expenseTotal.total),
+  };
 
-  const income = [...incByLabel.entries()]
-    .map(([label, vals]) => ({
-      label,
-      kind: "Income" as const,
-      total: sumMoney(vals),
-    }))
-    .sort(byMagnitudeDesc);
-  const expense = [...expByLabel.entries()]
-    .map(([label, vals]) => ({
-      label,
-      kind: "Expense" as const,
-      total: sumMoney(vals),
-    }))
-    .sort(byMagnitudeDesc);
-
-  const incomeTotal = sumMoney(income.map((r) => r.total));
-  const expenseTotal = sumMoney(expense.map((r) => r.total));
   return {
     range,
     grain,
-    series,
+    periods: periods.map((p) => ({ key: p.key, label: p.label })),
     income,
     expense,
-    totals: {
-      income: incomeTotal,
-      expense: expenseTotal,
-      net: addMoney(incomeTotal, expenseTotal),
-    },
+    incomeTotal,
+    expenseTotal,
+    net,
   };
 }
 

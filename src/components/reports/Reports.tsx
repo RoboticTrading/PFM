@@ -113,92 +113,139 @@ function IncomeReport({
   const q = trpc.reports.incomeStatement.useQuery({ from, to, grain });
   if (q.isLoading) return <Loading />;
   if (q.isError || !q.data) return <Failed />;
-  const { series, income, expense, totals } = q.data;
+  const { periods, income, expense, incomeTotal, expenseTotal, net } = q.data;
   const empty = income.length === 0 && expense.length === 0;
+  const nCols = periods.length + 1; // period columns + Sum
 
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3">
-        <Stat label="Income" value={totals.income} tone="pos" />
-        <Stat label="Expenses" value={totals.expense} tone="neg" />
-        <Stat label="Net" value={totals.net} tone="net" emphasize />
+        <Stat label="Income" value={incomeTotal.total} tone="pos" />
+        <Stat label="Expenses" value={expenseTotal.total} tone="neg" />
+        <Stat label="Net" value={net.total} tone="net" emphasize />
       </div>
 
       {empty ? (
         <Empty />
       ) : (
-        <>
-          <Card title={`Per ${grainNoun(grain)}`}>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Period</TableHead>
-                  <TableHead className="text-right">Income</TableHead>
-                  <TableHead className="text-right">Expenses</TableHead>
-                  <TableHead className="text-right">Net</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {series.map((p) => (
-                  <TableRow key={p.key}>
-                    <TableCell className="text-fg">{p.label}</TableCell>
-                    <MoneyCell v={p.income} />
-                    <MoneyCell v={p.expense} />
-                    <MoneyCell v={p.net} bold />
-                  </TableRow>
+        <div className="overflow-x-auto rounded-md border border-border bg-card">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-border text-[10px] uppercase tracking-wide text-fg-subtle">
+                <th className="sticky left-0 z-10 bg-card px-3 py-2 text-left font-medium">
+                  Category
+                </th>
+                {periods.map((p) => (
+                  <th
+                    key={p.key}
+                    className="whitespace-nowrap px-3 py-2 text-right font-medium"
+                  >
+                    {p.label}
+                  </th>
                 ))}
-              </TableBody>
-            </Table>
-          </Card>
+                <th className="whitespace-nowrap border-l border-border px-3 py-2 text-right font-semibold text-fg-muted">
+                  Sum
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <SectionRow label="Income" nCols={nCols} />
+              {income.map((r) => (
+                <PivotRow key={r.label} row={r} />
+              ))}
+              <PivotRow row={incomeTotal} strong topBorder />
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <BreakdownCard
-              title="Income by category"
-              rows={income}
-              total={totals.income}
-            />
-            <BreakdownCard
-              title="Expenses by category"
-              rows={expense}
-              total={totals.expense}
-            />
-          </div>
-        </>
+              <tr aria-hidden>
+                <td className="py-2" colSpan={nCols + 1} />
+              </tr>
+
+              <SectionRow label="Expenses" nCols={nCols} />
+              {expense.map((r) => (
+                <PivotRow key={r.label} row={r} />
+              ))}
+              <PivotRow row={expenseTotal} strong topBorder />
+
+              <PivotRow row={net} strong doubleBorder />
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
 }
 
-function BreakdownCard({
-  title,
-  rows,
-  total,
+type PivotRowData = { label: string; byPeriod: string[]; total: string };
+
+/** A section band (Income / Expenses) — label pinned in the sticky column. */
+function SectionRow({ label, nCols }: { label: string; nCols: number }) {
+  return (
+    <tr className="border-t border-border">
+      <td className="sticky left-0 z-10 bg-card px-3 pb-1 pt-3 text-left text-[10px] font-semibold uppercase tracking-wide text-accent">
+        {label}
+      </td>
+      <td className="bg-card" colSpan={nCols} />
+    </tr>
+  );
+}
+
+/** One statement line: sticky label + per-period cells + a bordered Sum cell. */
+function PivotRow({
+  row,
+  strong,
+  topBorder,
+  doubleBorder,
 }: {
-  title: string;
-  rows: { label: string; total: string }[];
-  total: string;
+  row: PivotRowData;
+  strong?: boolean;
+  topBorder?: boolean;
+  doubleBorder?: boolean;
 }) {
   return (
-    <Card title={title}>
-      {rows.length === 0 ? (
-        <p className="p-3 text-sm text-fg-muted">Nothing categorized yet.</p>
-      ) : (
-        <Table>
-          <TableBody>
-            {rows.map((r) => (
-              <TableRow key={r.label}>
-                <TableCell className="text-fg">{r.label}</TableCell>
-                <MoneyCell v={r.total} />
-              </TableRow>
-            ))}
-            <TableRow className="border-t-2 border-border">
-              <TableCell className="font-semibold text-fg">Total</TableCell>
-              <MoneyCell v={total} bold />
-            </TableRow>
-          </TableBody>
-        </Table>
+    <tr
+      className={cn(
+        topBorder && "border-t border-border",
+        doubleBorder && "border-t-2 border-border",
       )}
-    </Card>
+    >
+      <td
+        className={cn(
+          "sticky left-0 z-10 whitespace-nowrap bg-card px-3 py-1.5 text-left",
+          strong ? "font-semibold text-fg" : "text-fg",
+        )}
+      >
+        {row.label}
+      </td>
+      {row.byPeriod.map((v, i) => (
+        <PivotCell key={i} v={v} strong={strong} />
+      ))}
+      <PivotCell v={row.total} strong bordered />
+    </tr>
+  );
+}
+
+/** A money cell: red for negative, muted dash for exactly zero (keeps the grid readable). */
+function PivotCell({
+  v,
+  strong,
+  bordered,
+}: {
+  v: string;
+  strong?: boolean;
+  bordered?: boolean;
+}) {
+  const zero = Number(v) === 0;
+  const neg = v.startsWith("-");
+  return (
+    <td
+      className={cn(
+        "whitespace-nowrap px-3 py-1.5 text-right font-mono tabular-nums",
+        bordered && "border-l border-border font-semibold",
+        zero ? "text-fg-subtle" : neg ? "text-danger" : "text-fg",
+        strong && "font-semibold",
+      )}
+    >
+      {zero ? "–" : formatUsd(v)}
+    </td>
   );
 }
 
